@@ -37,7 +37,13 @@
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             padding: 25px 30px;
-            text-align: center;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header-content {
+            flex: 1;
         }
 
         .header h1 {
@@ -49,6 +55,23 @@
         .header p {
             font-size: 14px;
             opacity: 0.9;
+        }
+
+        .nav-link {
+            padding: 10px 20px;
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            border-radius: 8px;
+            text-decoration: none;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+        }
+
+        .nav-link:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
         }
 
         .chat-container {
@@ -356,8 +379,11 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>🏥 Synthea Medical Database Assistant</h1>
-            <p>Ask questions about patient records, procedures, medications, and more</p>
+            <div class="header-content">
+                <h1>🏥 Synthea Medical Database Assistant</h1>
+                <p>Ask questions about patient records, procedures, medications, and more</p>
+            </div>
+            <a href="/graph" class="nav-link">View Graph</a>
         </div>
 
         <div class="chat-container" id="chatContainer">
@@ -378,7 +404,7 @@
             <button onclick="fillExample('What is the database schema?')">Database schema</button>
             <button onclick="fillExample('How many patients are in the database?')">Patient count</button>
             <button onclick="fillExample('Which procedures were performed most frequently? Show top 10.')">Top procedures</button>
-            <button onclick="fillExample('Which patient has undergone the most expensive treatment?')">Most expensive treatment</button>
+            <button onclick="fillExample('Which patient has spent the most on treatments?')">Most expenses</button>
         </div>
 
         <div class="input-container">

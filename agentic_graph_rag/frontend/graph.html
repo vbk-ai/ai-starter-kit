@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LangGraph Visualization - Agentic Graph RAG</title>
+    <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 1400px;
+            height: 90vh;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 25px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header-content {
+            flex: 1;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .header p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .nav-buttons {
+            display: flex;
+            gap: 10px;
+        }
+
+        .nav-button {
+            padding: 10px 20px;
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            text-decoration: none;
+            transition: all 0.3s ease;
+        }
+
+        .nav-button:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+        }
+
+        .content {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+
+        .sidebar {
+            width: 300px;
+            background: #f8f9fa;
+            border-right: 1px solid #e0e0e0;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .graph-container {
+            flex: 1;
+            position: relative;
+        }
+
+        #network {
+            width: 100%;
+            height: 100%;
+        }
+
+        .legend {
+            margin-bottom: 20px;
+        }
+
+        .legend h3 {
+            font-size: 16px;
+            margin-bottom: 12px;
+            color: #333;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+            margin-right: 10px;
+            border: 2px solid #666;
+        }
+
+        .legend-line {
+            width: 30px;
+            height: 3px;
+            margin-right: 10px;
+        }
+
+        .info-section {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #e0e0e0;
+        }
+
+        .info-section h3 {
+            font-size: 16px;
+            margin-bottom: 12px;
+            color: #333;
+        }
+
+        .info-section p {
+            font-size: 13px;
+            color: #666;
+            line-height: 1.6;
+            margin-bottom: 8px;
+        }
+
+        .node-list {
+            margin-top: 10px;
+        }
+
+        .node-item {
+            padding: 8px 12px;
+            background: white;
+            border-radius: 6px;
+            margin-bottom: 8px;
+            font-size: 13px;
+            border-left: 3px solid #667eea;
+        }
+
+        .node-item strong {
+            color: #667eea;
+        }
+
+        .subgraph-section {
+            margin-top: 20px;
+            padding: 15px;
+            background: #e8eaf6;
+            border-radius: 8px;
+        }
+
+        .subgraph-section h4 {
+            font-size: 14px;
+            color: #5c6bc0;
+            margin-bottom: 8px;
+        }
+
+        .graph-controls {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+        }
+
+        .control-button {
+            display: block;
+            width: 100%;
+            padding: 8px 15px;
+            margin-bottom: 8px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: background 0.3s ease;
+        }
+
+        .control-button:hover {
+            background: #5568d3;
+        }
+
+        .control-button:last-child {
+            margin-bottom: 0;
+        }
+
+        .node-tooltip {
+            position: absolute;
+            background: white;
+            border: 2px solid #667eea;
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            z-index: 2000;
+            max-width: 350px;
+            display: none;
+            pointer-events: none;
+        }
+
+        .node-tooltip.visible {
+            display: block;
+        }
+
+        .tooltip-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #667eea;
+            margin-bottom: 10px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .tooltip-description {
+            font-size: 14px;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .tooltip-list {
+            margin-top: 8px;
+            padding-left: 20px;
+        }
+
+        .tooltip-list li {
+            font-size: 13px;
+            color: #666;
+            margin-bottom: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="header-content">
+                <h1>LangGraph Workflow Visualization</h1>
+                <p>Interactive graph showing agent nodes, edges, and routing logic</p>
+            </div>
+            <div class="nav-buttons">
+                <a href="/app" class="nav-button">Back to Chat</a>
+            </div>
+        </div>
+
+        <div class="content">
+            <div class="sidebar">
+                <div class="legend">
+                    <h3>Node Types</h3>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #4CAF50;"></div>
+                        <span>Start/End</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #2196F3;"></div>
+                        <span>Router/Decision</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #FF9800;"></div>
+                        <span>Agent/LLM</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #9C27B0;"></div>
+                        <span>Tool Execution</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #F44336;"></div>
+                        <span>Subgraph</span>
+                    </div>
+                </div>
+
+                <div class="legend">
+                    <h3>Edge Types</h3>
+                    <div class="legend-item">
+                        <div class="legend-line" style="background: #666;"></div>
+                        <span>Regular Edge</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-line" style="background: #FF5722; height: 4px;"></div>
+                        <span>Conditional Edge</span>
+                    </div>
+                </div>
+
+                <div class="info-section">
+                    <h3>Main Graph Nodes</h3>
+                    <div class="node-list">
+                        <div class="node-item">
+                            <strong>router</strong><br>
+                            Classifies queries as standard or analytics
+                        </div>
+                        <div class="node-item">
+                            <strong>agent</strong><br>
+                            Main LLM agent with tool-calling
+                        </div>
+                        <div class="node-item">
+                            <strong>tools</strong><br>
+                            Executes patient query tools
+                        </div>
+                        <div class="node-item">
+                            <strong>cypher</strong><br>
+                            Complex analytics subgraph
+                        </div>
+                        <div class="node-item">
+                            <strong>summary</strong><br>
+                            Synthesizes results into response
+                        </div>
+                    </div>
+                </div>
+
+                <div class="subgraph-section">
+                    <h4>Cypher Subgraph</h4>
+                    <p style="font-size: 12px; color: #5c6bc0;">
+                        <strong>cypher_generator:</strong> Generates Cypher queries<br>
+                        <strong>execute_query:</strong> Executes queries and loops back
+                    </p>
+                </div>
+
+                <div class="info-section">
+                    <h3>About</h3>
+                    <p>This visualization shows the LangGraph workflow structure used by the agentic system.</p>
+                    <p><strong>Conditional edges</strong> (thicker, orange) route based on query classification or tool requirements.</p>
+                    <p><strong>Regular edges</strong> (thin, gray) represent fixed transitions.</p>
+                </div>
+            </div>
+
+            <div class="graph-container">
+                <div class="graph-controls">
+                    <button class="control-button" onclick="network.fit()">Fit View</button>
+                    <button class="control-button" onclick="togglePhysics()">Toggle Physics</button>
+                    <button class="control-button" onclick="resetZoom()">Reset Zoom</button>
+                </div>
+                <div id="network"></div>
+                <div class="node-tooltip" id="nodeTooltip">
+                    <div class="tooltip-title" id="tooltipTitle"></div>
+                    <div class="tooltip-description" id="tooltipDescription"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="text/javascript">
+        // Define the graph structure based on the LangGraph implementation
+        const nodes = new vis.DataSet([
+            // Main graph nodes
+            { id: 'START', label: 'START', color: '#4CAF50', shape: 'box', font: { color: 'white', size: 16, face: 'monospace' } },
+            { id: 'router', label: 'ROUTER\n(classify query)', color: '#2196F3', shape: 'box', font: { color: 'white', size: 14 } },
+            { id: 'agent', label: 'AGENT\n(LLM + tools)', color: '#FF9800', shape: 'box', font: { color: 'white', size: 14 } },
+            { id: 'tools', label: 'TOOLS\n(execute)', color: '#9C27B0', shape: 'box', font: { color: 'white', size: 14 } },
+            { id: 'cypher', label: 'CYPHER\n(subgraph)', color: '#F44336', shape: 'box', font: { color: 'white', size: 14 } },
+            { id: 'summary', label: 'SUMMARY\n(synthesize)', color: '#FF9800', shape: 'box', font: { color: 'white', size: 14 } },
+            { id: 'END', label: 'END', color: '#4CAF50', shape: 'box', font: { color: 'white', size: 16, face: 'monospace' } },
+
+            // Cypher subgraph nodes (positioned separately)
+            { id: 'cypher_start', label: 'CYPHER\nSTART', color: '#4CAF50', shape: 'ellipse', font: { color: 'white', size: 12 } },
+            { id: 'cypher_generator', label: 'CYPHER\nGENERATOR', color: '#E91E63', shape: 'box', font: { color: 'white', size: 12 } },
+            { id: 'execute_query', label: 'EXECUTE\nQUERY', color: '#9C27B0', shape: 'box', font: { color: 'white', size: 12 } },
+            { id: 'cypher_end', label: 'CYPHER\nEND', color: '#4CAF50', shape: 'ellipse', font: { color: 'white', size: 12 } }
+        ]);
+
+        const edges = new vis.DataSet([
+            // Main graph edges
+            { from: 'START', to: 'router', arrows: 'to', width: 2, color: { color: '#666' } },
+
+            // Conditional edges from router (thicker, different color)
+            { from: 'router', to: 'agent', arrows: 'to', width: 4, color: { color: '#FF5722' },
+              label: 'standard_tools', font: { align: 'top', size: 11 }, smooth: { type: 'curvedCW', roundness: 0.2 } },
+            { from: 'router', to: 'cypher', arrows: 'to', width: 4, color: { color: '#FF5722' },
+              label: 'custom_analytics', font: { align: 'top', size: 11 }, smooth: { type: 'curvedCW', roundness: 0.2 } },
+
+            // Conditional edges from agent (thicker, different color)
+            { from: 'agent', to: 'tools', arrows: 'to', width: 4, color: { color: '#FF5722' },
+              label: 'has tool calls', font: { align: 'top', size: 11 }, smooth: { type: 'curvedCW', roundness: 0.2 } },
+            { from: 'agent', to: 'summary', arrows: 'to', width: 4, color: { color: '#FF5722' },
+              label: 'no tools', font: { align: 'top', size: 11 }, smooth: { type: 'curvedCW', roundness: -0.2 } },
+
+            // Regular edges
+            { from: 'tools', to: 'summary', arrows: 'to', width: 2, color: { color: '#666' } },
+            { from: 'cypher', to: 'summary', arrows: 'to', width: 2, color: { color: '#666' } },
+            { from: 'summary', to: 'END', arrows: 'to', width: 2, color: { color: '#666' } },
+
+            // Cypher subgraph edges
+            { from: 'cypher_start', to: 'cypher_generator', arrows: 'to', width: 2, color: { color: '#666' } },
+
+            // Conditional edges in subgraph
+            { from: 'cypher_generator', to: 'execute_query', arrows: 'to', width: 4, color: { color: '#FF5722' },
+              label: 'has tools', font: { align: 'top', size: 10 }, smooth: { type: 'curvedCW', roundness: 0.3 } },
+            { from: 'cypher_generator', to: 'cypher_end', arrows: 'to', width: 4, color: { color: '#FF5722' },
+              label: 'no tools', font: { align: 'top', size: 10 }, smooth: { type: 'curvedCW', roundness: -0.3 } },
+
+            // Loop back edge in subgraph
+            { from: 'execute_query', to: 'cypher_generator', arrows: 'to', width: 2, color: { color: '#666' },
+              label: 'loop', font: { align: 'top', size: 10 }, smooth: { type: 'curvedCW', roundness: 0.5 }, dashes: true }
+        ]);
+
+        // Create the network
+        const container = document.getElementById('network');
+        const data = { nodes: nodes, edges: edges };
+
+        const options = {
+            layout: {
+                hierarchical: {
+                    enabled: true,
+                    direction: 'UD',
+                    sortMethod: 'directed',
+                    nodeSpacing: 200,
+                    levelSeparation: 150,
+                    treeSpacing: 200
+                }
+            },
+            physics: {
+                enabled: false
+            },
+            interaction: {
+                hover: true,
+                navigationButtons: true,
+                keyboard: true,
+                zoomView: true,
+                dragView: true
+            },
+            nodes: {
+                borderWidth: 2,
+                borderWidthSelected: 4,
+                size: 25,
+                font: {
+                    size: 14,
+                    face: 'arial'
+                },
+                margin: 10
+            },
+            edges: {
+                smooth: {
+                    type: 'cubicBezier',
+                    forceDirection: 'vertical',
+                    roundness: 0.4
+                },
+                font: {
+                    size: 11,
+                    align: 'middle',
+                    background: 'white',
+                    strokeWidth: 0
+                }
+            }
+        };
+
+        const network = new vis.Network(container, data, options);
+
+        // Tooltip element
+        const tooltip = document.getElementById('nodeTooltip');
+        const tooltipTitle = document.getElementById('tooltipTitle');
+        const tooltipDescription = document.getElementById('tooltipDescription');
+
+        // Add click listener for nodes
+        network.on("click", function(params) {
+            if (params.nodes.length > 0) {
+                const nodeId = params.nodes[0];
+                const nodeInfo = getNodeInfo(nodeId);
+                showTooltip(params.pointer.DOM.x, params.pointer.DOM.y, nodeInfo);
+            } else {
+                hideTooltip();
+            }
+        });
+
+        // Hide tooltip when clicking on canvas
+        network.on("click", function(params) {
+            if (params.nodes.length === 0) {
+                hideTooltip();
+            }
+        });
+
+        // Physics toggle
+        let physicsEnabled = false;
+        function togglePhysics() {
+            physicsEnabled = !physicsEnabled;
+            network.setOptions({ physics: { enabled: physicsEnabled } });
+        }
+
+        function resetZoom() {
+            network.fit({ animation: true });
+        }
+
+        function showTooltip(x, y, nodeInfo) {
+            tooltipTitle.textContent = nodeInfo.title;
+            tooltipDescription.innerHTML = nodeInfo.description;
+
+            // Position tooltip near the click, but keep it in viewport
+            const graphContainer = document.querySelector('.graph-container');
+            const rect = graphContainer.getBoundingClientRect();
+
+            let tooltipX = x + 20;
+            let tooltipY = y + 20;
+
+            // Adjust if tooltip would go off screen
+            if (tooltipX + 350 > rect.width) {
+                tooltipX = x - 370;
+            }
+            if (tooltipY + 200 > rect.height) {
+                tooltipY = y - 220;
+            }
+
+            tooltip.style.left = tooltipX + 'px';
+            tooltip.style.top = tooltipY + 'px';
+            tooltip.classList.add('visible');
+        }
+
+        function hideTooltip() {
+            tooltip.classList.remove('visible');
+        }
+
+        function getNodeInfo(nodeId) {
+            const nodeDescriptions = {
+                'START': {
+                    title: 'START',
+                    description: 'Entry point of the main agent workflow.'
+                },
+                'router': {
+                    title: 'Router Node',
+                    description: 'Classifies incoming queries as either:<ul class="tooltip-list"><li>"standard_tools": Direct patient queries</li><li>"custom_analytics": Complex analytics requiring Cypher</li></ul>'
+                },
+                'agent': {
+                    title: 'Agent Node',
+                    description: 'Main LLM-based agent with tool-calling capabilities. Has access to tools for querying patient data:<ul class="tooltip-list"><li>get_patient_procedures()</li><li>get_patient_conditions()</li><li>get_patient_medications()</li><li>get_patient_encounters()</li><li>search_patients()</li><li>get_database_schema()</li></ul>'
+                },
+                'tools': {
+                    title: 'Tools Node',
+                    description: 'Executes tool calls from the agent and tracks all Cypher queries executed.'
+                },
+                'cypher': {
+                    title: 'Cypher Subgraph',
+                    description: 'Handles complex analytics queries. Contains its own internal workflow with iterative query generation and execution.'
+                },
+                'summary': {
+                    title: 'Summary Node',
+                    description: 'Synthesizes tool and query results into a natural language response. This is the final step before returning to the user.'
+                },
+                'END': {
+                    title: 'END',
+                    description: 'End point - returns response to user.'
+                },
+                'cypher_start': {
+                    title: 'Cypher Subgraph Start',
+                    description: 'Entry point of the Cypher subgraph for complex analytics.'
+                },
+                'cypher_generator': {
+                    title: 'Cypher Generator',
+                    description: 'LLM-based node that analyzes the user question, generates appropriate Cypher queries, and provides explanations.'
+                },
+                'execute_query': {
+                    title: 'Execute Query',
+                    description: 'Executes the generated Cypher query against the database, formats results, and loops back to the generator for refinement if needed.'
+                },
+                'cypher_end': {
+                    title: 'Cypher Subgraph End',
+                    description: 'Exit point of the Cypher subgraph.'
+                }
+            };
+
+            return nodeDescriptions[nodeId] || { title: nodeId, description: 'Node information not available.' };
+        }
+
+        // Initial fit
+        setTimeout(() => network.fit(), 100);
+    </script>
+</body>
+</html>

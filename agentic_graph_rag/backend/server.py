@@ -287,6 +287,11 @@ try:
     async def serve_app():
         """Serve the main application page."""
         return FileResponse(str(frontend_dir / "index.html"))
+
+    @app.get("/graph")
+    async def serve_graph():
+        """Serve the LangGraph visualization page."""
+        return FileResponse(str(frontend_dir / "graph.html"))
 except Exception as e:
     print(f"Note: Frontend files not mounted - {e}")
 

@@ -52,6 +52,14 @@ Cypher Subgraph (2 tests):
    - Cypher tracked: Generated query with ORDER BY and LIMIT
    - Query type: Aggregation, grouping, and ranking
 
+Response Quality Tests:
+-----------------------
+9. response_formatting - test_response_formatting_no_comprehensive_preamble
+   - Tests: Summary agent response quality and directness
+   - Expected routing: Cypher subgraph (analytics query)
+   - Validates: NO "comprehensive" preambles, direct answers
+   - Expected content: "Leonor133 Dicki44" and "$4,570,388.07"
+
 QUERY TRACKING VERIFICATION:
 ============================
 Each test verifies:
@@ -193,6 +201,10 @@ def test_get_patient_medications_tool(agent, conversation_state):
     print(f"\n✓ Queries executed: {len(conversation_state['queries'])}")
 
     assert len(conversation_state["queries"]) > 0, "No queries were executed"
+
+    # Assert that response should not mention "recent 30" when less than 30 results returned
+    assert "recent 30" not in response.lower(), \
+        "Response should not mention 'recent 30' when fewer than 30 results were returned"
 
     latest = conversation_state["queries"][-1]
     print(f"\nLatest Query:")
@@ -340,3 +352,53 @@ def test_cypher_subgraph_complex_analytics(agent, conversation_state):
     print(f"\nLatest Query:")
     print(f"  Source: {latest['source']}")
     print(f"  Cypher (first 200 chars): {latest['query'][:200]}...")
+
+
+@pytest.mark.timeout(60)
+def test_response_formatting_no_comprehensive_preamble(agent, conversation_state):
+    """
+    Test 9: Response formatting - No comprehensive preambles
+    Coverage: Verify summary agent provides direct answers without verbose preambles
+    Expected: Direct answer with patient name and amount, NO "comprehensive" phrase
+    Routing: Analytics query → cypher subgraph
+
+    This test ensures the summary agent:
+    - Does NOT use "To provide a more comprehensive answer"
+    - Contains expected data: "Leonor133 Dicki44" and "$4,570,388.07"
+    - Formats single results as sentences, NOT bullet lists
+    """
+    print("\n" + "-" * 60)
+    print("Test 9: Response Formatting - No Comprehensive Preamble")
+    print("-" * 60)
+
+    question = "Which patient has spent the most on treatments?"
+    print(f"Question: {question}\n")
+
+    response, conversation_state["history"], conversation_state["queries"] = query_agent(
+        agent, question, conversation_state["history"], conversation_state["queries"]
+    )
+
+    print("Full Response:")
+    print("-" * 60)
+    print(response)
+    print("-" * 60)
+
+    # Check that response contains expected content
+    assert "Leonor133 Dicki44" in response, \
+        "Response should contain patient name 'Leonor133 Dicki44'"
+
+    assert "$4,570,388.07" in response, \
+        "Response should contain amount '$4,570,388.07'"
+
+    # Check that response does NOT contain the preamble phrase
+    assert "To provide a more comprehensive answer" not in response, \
+        "Response should NOT contain 'To provide a more comprehensive answer'"
+
+    print("\n✓ Test passed: Response is direct and concise")
+    print(f"✓ Contains patient name: Leonor133 Dicki44")
+    print(f"✓ Contains amount: $4,570,388.07")
+    print(f"✓ Does NOT contain comprehensive preamble")
+
+    # Verify at least one query was executed
+    assert len(conversation_state["queries"]) > 0, "No queries were executed"
+    print(f"✓ Queries executed: {len(conversation_state['queries'])}")

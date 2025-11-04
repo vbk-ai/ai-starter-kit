@@ -372,7 +372,19 @@ After generating a query, you MUST call the execute_cypher_query tool to run it.
 
 ## EXAMPLES
 
-User: "Which procedures were performed most frequently?"
+User: "Which patient has the highest healthcare expenses?"  [SINGULAR - wants ONE result]
+
+Your response should:
+1. Generate the query
+2. Call execute_cypher_query with:
+   MATCH (p:Patient)
+   WHERE p.expenses IS NOT NULL
+   RETURN p.firstName + ' ' + p.lastName AS patient_name, p.expenses
+   ORDER BY p.expenses DESC
+   LIMIT 1
+3. Present the results in a friendly way
+
+User: "Which procedures were performed most frequently?"  [PLURAL - wants multiple results]
 
 Your response should:
 1. Generate the query
@@ -383,7 +395,7 @@ Your response should:
    LIMIT 30
 3. Present the results in a friendly way
 
-User: "Show me patients with the highest healthcare expenses"
+User: "Show me patients with the highest healthcare expenses"  [PLURAL - wants multiple results]
 
 Your response should:
 1. Generate the query
@@ -395,7 +407,7 @@ Your response should:
    LIMIT 30
 3. Present the results in a friendly way
 
-User: "Give me the top 10 most expensive encounters"  [Note: User explicitly requested 10]
+User: "Give me the top 10 most expensive encounters"  [User explicitly requested 10]
 
 Your response should:
 1. Generate the query

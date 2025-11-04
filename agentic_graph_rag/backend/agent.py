@@ -45,7 +45,12 @@ def get_patient_procedures(patient_name: str, limit: int = 30) -> str:
             log("TOOL", f"No procedures found for '{patient_name}'", "get_patient_procedures")
             return f"No procedures found for patient '{patient_name}'. The patient may not exist or has no recorded procedures."
 
-        output = f"Procedures for {results[0]['patient_name']} (showing up to {limit} most recent):\n\n"
+        # Only mention limit if we hit the limit (results count equals limit)
+        if len(results) >= limit:
+            output = f"Procedures for {results[0]['patient_name']} (showing up to {limit} most recent):\n\n"
+        else:
+            output = f"Procedures for {results[0]['patient_name']}:\n\n"
+
         for i, record in enumerate(results, 1):
             output += f"{i}. {record['procedure_description']}\n"
             output += f"   Date: {record['encounter_date']}\n"
@@ -77,7 +82,12 @@ def get_patient_conditions(patient_name: str, limit: int = 30) -> str:
         if not results:
             return f"No conditions found for patient '{patient_name}'. The patient may not exist or has no recorded conditions."
 
-        output = f"Conditions for {results[0]['patient_name']} (showing up to {limit} most recent):\n\n"
+        # Only mention limit if we hit the limit (results count equals limit)
+        if len(results) >= limit:
+            output = f"Conditions for {results[0]['patient_name']} (showing up to {limit} most recent):\n\n"
+        else:
+            output = f"Conditions for {results[0]['patient_name']}:\n\n"
+
         for i, record in enumerate(results, 1):
             output += f"{i}. {record['condition_description']}\n"
             output += f"   Diagnosed: {record['encounter_date']}\n\n"
@@ -106,7 +116,12 @@ def get_patient_medications(patient_name: str, limit: int = 30) -> str:
         if not results:
             return f"No medications found for patient '{patient_name}'. The patient may not exist or has no prescribed medications."
 
-        output = f"Medications for {results[0]['patient_name']} (showing up to {limit} most recent):\n\n"
+        # Only mention limit if we hit the limit (results count equals limit)
+        if len(results) >= limit:
+            output = f"Medications for {results[0]['patient_name']} (showing up to {limit} most recent):\n\n"
+        else:
+            output = f"Medications for {results[0]['patient_name']}:\n\n"
+
         for i, record in enumerate(results, 1):
             output += f"{i}. {record['medication']}\n"
             output += f"   Prescribed: {record['prescribed_date']}\n\n"
@@ -135,7 +150,12 @@ def get_patient_encounters(patient_name: str, limit: int = 30) -> str:
         if not results:
             return f"No encounters found for patient '{patient_name}'. The patient may not exist."
 
-        output = f"Encounters for {results[0]['patient_name']} (showing up to {limit} most recent):\n\n"
+        # Only mention limit if we hit the limit (results count equals limit)
+        if len(results) >= limit:
+            output = f"Encounters for {results[0]['patient_name']} (showing up to {limit} most recent):\n\n"
+        else:
+            output = f"Encounters for {results[0]['patient_name']}:\n\n"
+
         for i, record in enumerate(results, 1):
             output += f"{i}. {record['encounter_type']}\n"
             output += f"   Date: {record['encounter_date']}\n"
@@ -546,6 +566,10 @@ All tools return a maximum of 30 results by default, sorted by most recent first
 - For patient search, results are sorted by name similarity to the search term
 - For patient data (procedures, medications, conditions, encounters), results are sorted by most recent date first
 
+**TOOL RESULT HANDLING:**
+- The query results may be limited by a LIMIT clause and that is indicated in the response text (commonly LIMIT 30)
+- If the query results are already limited, do not limit them further and show them as-is
+
 **For complex analytics and aggregations:**
 These questions will automatically be routed to a specialized Cypher query generator.
 You don't need to select a tool - the system will handle it automatically.
@@ -555,10 +579,6 @@ Examples of questions that get special routing:
 - "What's the most common procedure?"
 - "Which procedures were performed most frequently?"
 - "Show me patients with the highest expenses"
-
-QUERY TRANSPARENCY:
-You have access to all Cypher queries that were executed during this conversation.
-If helpful or requested by the user, you can explain what queries were run.
 
 Always be clear and helpful in your responses. If a patient is not found, suggest searching by name.
 When presenting results, format them clearly and concisely."""
@@ -602,45 +622,53 @@ CRITICAL - OUTPUT FORMAT:
 
 INSTRUCTIONS:
 1. Review the conversation history, including any tool outputs or query results
-2. Check the Cypher queries that were executed - many have LIMIT clauses (commonly LIMIT 30)
-3. If you see exactly 30 results AND the query has a LIMIT clause, you MUST indicate that these are limited results
-4. Provide a direct, helpful answer to the user's question
-5. Be conversational and natural - don't use unnecessary preambles
-6. If data was successfully retrieved: Present the findings clearly
-7. If there were errors: Explain what went wrong in user-friendly terms
-8. DO NOT return empty responses, symbols like "[]", or placeholder text
+2. Extract ALL specific data from previous responses (names, numbers, dollar amounts, dates, etc.)
+3. PRESERVE exact numerical values - if you see "$4,570,388.07" use that EXACT amount
+4. DO NOT add uncertainty or qualifiers like "I would need more context" when data is already provided
+5. The query results may be limited by a LIMIT clause and that is indicated in the response text (commonly LIMIT 30)
+6. If the query results are already limited, do not limit them further and show them as-is
+7. Provide a direct, helpful answer to the user's question using the EXACT data provided
+8. Be conversational and natural - don't use unnecessary preambles
+9. If data was successfully retrieved: Present the findings clearly with all specific values
+10. If there were errors: Explain what went wrong in user-friendly terms
+11. DO NOT return empty responses, symbols like "[]", or placeholder text
 
 CRITICAL - HANDLING LIMITED RESULTS:
-- If you see exactly 30 results and the Cypher query contains "LIMIT 30" or similar:
-  - Say "the most recent 30..." or "showing 30 of possibly more..."
-  - DO NOT say "there are 30 total" or imply this is the complete count
-  - Make it clear these are the TOP/MOST RECENT results, not all results
-- If the query has ORDER BY date DESC, say "most recent"
-- If the query has no LIMIT clause or the result count is less than the limit, you can state the total
+- If the query has ORDER BY date DESC and mentions a limit, say "most recent"
+- If the result count is less than the limit mentioned in the tool output, the tool will NOT mention the limit
 
 RESPONSE STYLE:
-- Answer the question directly - no preambles or filler phrases
+- Answer the question directly - no preambles or filler phrases like "To provide a more comprehensive answer"
+- DO NOT add phrases like "I would need more context" or "based on available information" when complete data is provided
+- If you have specific numbers/amounts in the conversation, USE THEM - don't say you need more information
 - Pay attention to singular vs plural in the user's question:
   - "Which patient..." (singular) → Provide ONLY ONE result (the top/most relevant)
   - "Which patients..." (plural) → Provide multiple results (top 10-20)
   - "What is the most..." (singular) → ONE result
   - "What are the top..." (plural) → Multiple results
-- Format information clearly (use numbers, bullets, or clear sentences)
+- For single items: Use a simple sentence, NOT a bulleted or numbered list
+- For multiple items (2+): Use numbers, bullets, or clear sentences as appropriate
 - Be concise but complete
 
 EXAMPLES:
 
-Good Example 1 (successful query with no limit):
+Good Example 1 (successful count query):
 "There are 5,885 patients in the database."
 
-Good Example 2 (patient data with LIMIT 30 - notice "most recent"):
+Good Example 2 (single result - no bullet list):
+"Leonor133 Dicki44 has spent the most on treatments with total expenses of $4,570,388.07."
+
+Good Example 3 (another single result - no bullet):
+"The most common procedure is Electrocardiogram, performed 1,245 times."
+
+Good Example 4 (patient data with LIMIT 30 - multiple items):
 "Ethan766 has had the following procedures (showing the most recent 30):
 1. Electrocardiogram (2023-06-15)
 2. Chest X-ray (2023-03-22)
 3. Blood pressure monitoring (2023-01-10)
 [...27 more results]"
 
-Good Example 3 (exactly 30 results with LIMIT 30):
+Good Example 5 (exactly 30 results with LIMIT 30):
 "The most recent 30 diagnoses for patient Smith include:
 - Hypertension
 - Type 2 Diabetes
@@ -648,20 +676,31 @@ Good Example 3 (exactly 30 results with LIMIT 30):
 
 Note: There may be additional diagnoses beyond these 30 records."
 
-Good Example 4 (error case):
+Good Example 6 (error case):
 "I was unable to locate patient Ethan766 in the database. The patient may not exist in the system, or the identifier may be incorrect. Try searching by full name instead."
 
-Good Example 5 (analytics - full count, no limit issue):
+Good Example 7 (analytics - multiple items):
 "The most frequently performed procedures are:
 1. Electrocardiogram - 1,245 times
 2. Blood pressure check - 892 times
 3. Chest X-ray - 654 times"
 
-Good Example 6 (search results with limit):
+Good Example 8 (search results with limit):
 "Found 30 patients matching 'John' (showing most relevant matches):
 1. John Smith - DOB: 1985-03-15
 2. John Doe - DOB: 1990-07-22
 [...28 more]"
+
+IMPORTANT - Extracting Data from Previous Responses:
+If you see a previous AI message like: "The patient who has spent the most on treatments is Leonor133 Dicki44, with total healthcare expenses of $4,570,388.07."
+
+Your response should preserve the exact data:
+CORRECT: "Leonor133 Dicki44 has spent the most on treatments with total expenses of $4,570,388.07."
+WRONG: "Leonor133 Dicki44 has spent the most on treatments." (missing amount!)
+WRONG: "To provide a more comprehensive answer, I would need more context..." (data is already there!)
+WRONG: "Based on the available information, Leonor133 Dicki44 has spent the most..." (don't add uncertainty!)
+
+Extract the name AND the amount, and present them clearly without preambles.
 
 Provide your response now."""
 
