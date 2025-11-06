@@ -165,8 +165,8 @@ def test_get_patient_procedures_tool(agent, conversation_state):
         agent, question, conversation_state["history"], conversation_state["queries"]
     )
 
-    print("Response (first 400 chars):")
-    print(response[:400] + "..." if len(response) > 400 else response)
+    print("Response (FULL):")
+    print(response)
     print(f"\n✓ Queries executed: {len(conversation_state['queries'])}")
 
     assert len(conversation_state["queries"]) > 0, "No queries were executed"
@@ -196,8 +196,8 @@ def test_get_patient_medications_tool(agent, conversation_state):
         agent, question, conversation_state["history"], conversation_state["queries"]
     )
 
-    print("Response (first 400 chars):")
-    print(response[:400] + "..." if len(response) > 400 else response)
+    print("Response (FULL):")
+    print(response)
     print(f"\n✓ Queries executed: {len(conversation_state['queries'])}")
 
     assert len(conversation_state["queries"]) > 0, "No queries were executed"
@@ -231,11 +231,15 @@ def test_get_patient_conditions_tool(agent, conversation_state):
         agent, question, conversation_state["history"], conversation_state["queries"]
     )
 
-    print("Response (first 400 chars):")
-    print(response[:400] + "..." if len(response) > 400 else response)
+    print("Response (FULL):")
+    print(response)
     print(f"\n✓ Queries executed: {len(conversation_state['queries'])}")
 
     assert len(conversation_state["queries"]) > 0, "No queries were executed"
+
+    # Assert that response should not mention "top 30" when less than 30 results returned
+    assert "top 30" not in response.lower(), \
+        "Response should not mention 'top 30' when fewer than 30 results were returned"
 
 
 @pytest.mark.timeout(60)
@@ -402,3 +406,138 @@ def test_response_formatting_no_comprehensive_preamble(agent, conversation_state
     # Verify at least one query was executed
     assert len(conversation_state["queries"]) > 0, "No queries were executed"
     print(f"✓ Queries executed: {len(conversation_state['queries'])}")
+
+
+@pytest.mark.timeout(60)
+def test_validation_relevant_query(agent, conversation_state):
+    """
+    Test 10: Validation - Relevant Query
+    Coverage: Validation node accepts medically-relevant queries
+    Expected: Query passes validation and proceeds to agent
+    Routing: validation → agent → tools
+    """
+    print("\n" + "-" * 60)
+    print("Test 10: Validation - Relevant Medical Query")
+    print("-" * 60)
+
+    question = "What medications is patient Ethan766 taking?"
+    print(f"Question: {question}\n")
+
+    response, conversation_state["history"], conversation_state["queries"] = query_agent(
+        agent, question, conversation_state["history"], conversation_state["queries"]
+    )
+
+    print("Response (first 400 chars):")
+    print(response[:400] + "..." if len(response) > 400 else response)
+
+    # Should NOT be rejected
+    assert "I am sorry - I can only answer questions that pertain to the Synthea medical records" not in response, \
+        "Medically-relevant query should NOT be rejected by validation"
+
+    # Should proceed to execute queries
+    assert len(conversation_state["queries"]) > 0, "Relevant query should execute database queries"
+
+    print("\n✓ Test passed: Relevant query accepted by validation")
+    print(f"✓ Queries executed: {len(conversation_state['queries'])}")
+
+
+@pytest.mark.timeout(60)
+def test_validation_irrelevant_query_weather(agent, conversation_state):
+    """
+    Test 11: Validation - Irrelevant Query (Weather)
+    Coverage: Validation node rejects non-medical queries
+    Expected: Query is rejected with standard message
+    Routing: validation → end (no agent/tools)
+    """
+    print("\n" + "-" * 60)
+    print("Test 11: Validation - Irrelevant Query (Weather)")
+    print("-" * 60)
+
+    question = "What's the weather like today?"
+    print(f"Question: {question}\n")
+
+    response, conversation_state["history"], conversation_state["queries"] = query_agent(
+        agent, question, conversation_state["history"], conversation_state["queries"]
+    )
+
+    print("Response:")
+    print(response)
+
+    # Should be rejected with exact message
+    assert "I am sorry - I can only answer questions that pertain to the Synthea medical records" in response, \
+        "Irrelevant query should be rejected with standard message"
+
+    # Should NOT execute any queries
+    assert len(conversation_state["queries"]) == 0, \
+        "Rejected query should NOT execute any database queries"
+
+    print("\n✓ Test passed: Irrelevant query rejected by validation")
+    print(f"✓ No queries executed (as expected): {len(conversation_state['queries'])}")
+
+
+@pytest.mark.timeout(60)
+def test_validation_irrelevant_query_general_knowledge(agent, conversation_state):
+    """
+    Test 12: Validation - Irrelevant Query (General Knowledge)
+    Coverage: Validation node rejects general knowledge questions
+    Expected: Query is rejected with standard message
+    Routing: validation → end (no agent/tools)
+    """
+    print("\n" + "-" * 60)
+    print("Test 12: Validation - Irrelevant Query (General Knowledge)")
+    print("-" * 60)
+
+    question = "Who is the president of the United States?"
+    print(f"Question: {question}\n")
+
+    response, conversation_state["history"], conversation_state["queries"] = query_agent(
+        agent, question, conversation_state["history"], conversation_state["queries"]
+    )
+
+    print("Response:")
+    print(response)
+
+    # Should be rejected with exact message
+    assert "I am sorry - I can only answer questions that pertain to the Synthea medical records" in response, \
+        "General knowledge query should be rejected with standard message"
+
+    # Should NOT execute any queries
+    assert len(conversation_state["queries"]) == 0, \
+        "Rejected query should NOT execute any database queries"
+
+    print("\n✓ Test passed: General knowledge query rejected by validation")
+    print(f"✓ No queries executed (as expected): {len(conversation_state['queries'])}")
+
+
+@pytest.mark.timeout(60)
+def test_validation_edge_case_database_schema_query(agent, conversation_state):
+    """
+    Test 13: Validation - Edge Case (Database Schema Query)
+    Coverage: Validation accepts queries about the database itself
+    Expected: Query passes validation (database schema is relevant)
+    Routing: validation → agent → tools
+    """
+    print("\n" + "-" * 60)
+    print("Test 13: Validation - Edge Case (Database Schema)")
+    print("-" * 60)
+
+    question = "What is the database schema?"
+    print(f"Question: {question}\n")
+
+    response, conversation_state["history"], conversation_state["queries"] = query_agent(
+        agent, question, conversation_state["history"], conversation_state["queries"]
+    )
+
+    print("Response (first 400 chars):")
+    print(response[:400] + "..." if len(response) > 400 else response)
+
+    # Should NOT be rejected
+    assert "I am sorry - I can only answer questions that pertain to the Synthea medical records" not in response, \
+        "Database schema query should NOT be rejected by validation"
+
+    # Should contain schema information
+    assert "Patient" in response or "Encounter" in response or "schema" in response.lower(), \
+        "Response should contain schema information"
+
+    print("\n✓ Test passed: Database schema query accepted by validation")
+    print(f"✓ Response contains schema information")

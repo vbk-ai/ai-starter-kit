@@ -4,8 +4,9 @@ Neo4j database connection and query utilities for Synthea chatbot.
 import os
 import logging
 from neo4j import GraphDatabase
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Tuple
 from langsmith.run_helpers import traceable
+
 
 # Configure logger for database operations
 db_logger = logging.getLogger("synthea_database")
@@ -38,8 +39,6 @@ class Neo4jConnection:
         self.password = password or os.getenv("NEO4J_PASSWORD", "password123")
         self.database = database
         self.driver = None
-        self.last_executed_query = None  # Track the last executed query
-        self.last_query_params = None    # Track the last query parameters
 
     def connect(self):
         """Establish connection to Neo4j database."""
@@ -52,24 +51,23 @@ class Neo4jConnection:
             self.driver.close()
 
     @traceable(name="execute_neo4j_query", tags=["neo4j", "database"])
-    def execute_query(self, query: str, parameters: Dict[str, Any] = None) -> List[Dict[str, Any]]:
+    def execute_query(self, query: str, parameters: Dict[str, Any] = None) -> Tuple[List[Dict[str, Any]], str, Dict[str, Any]]:
         """
-        Execute a Cypher query and return results.
+        Execute a Cypher query and return results along with query information.
 
         Args:
             query: Cypher query string
             parameters: Query parameters
 
         Returns:
-            List of result records as dictionaries
+            Tuple of (results, query, parameters) where:
+            - results: List of result records as dictionaries
+            - query: The executed Cypher query string
+            - parameters: The query parameters used
         """
         if not self.driver:
             db_logger.debug("DATABASE: Connecting to Neo4j...")
             self.connect()
-
-        # Store the query and parameters for tracking
-        self.last_executed_query = query
-        self.last_query_params = parameters or {}
 
         db_logger.debug(f"DATABASE: Executing query: {query[:200]}...")
         db_logger.debug(f"DATABASE: Parameters: {parameters}")
@@ -79,13 +77,13 @@ class Neo4jConnection:
                 result = session.run(query, parameters or {})
                 records = [dict(record) for record in result]
                 db_logger.debug(f"DATABASE: Query returned {len(records)} records")
-                return records
+                return (records, query, parameters or {})
         except Exception as e:
             db_logger.error(f"DATABASE ERROR: {str(e)}")
             raise
 
     @traceable(name="get_patient_procedures_db", run_type="tool", tags=["neo4j", "patient", "procedures"])
-    def get_patient_procedures(self, patient_name: str, limit: int = 30) -> List[Dict[str, Any]]:
+    def get_patient_procedures(self, patient_name: str, limit: int = 30) -> Tuple[List[Dict[str, Any]], str, Dict[str, Any]]:
         """
         Get procedures for a specific patient, limited to most recent entries.
 
@@ -94,7 +92,7 @@ class Neo4jConnection:
             limit: Maximum number of results to return (default: 30)
 
         Returns:
-            List of procedures with details, sorted by most recent encounter date
+            Tuple of (results, query, parameters)
         """
         # Check if the name contains a space (indicating a full name search)
         has_space = ' ' in patient_name.strip()
@@ -130,7 +128,7 @@ class Neo4jConnection:
         return self.execute_query(query, {"patient_name": patient_name, "limit": limit})
 
     @traceable(name="get_patient_conditions_db", run_type="tool", tags=["neo4j", "patient", "conditions"])
-    def get_patient_conditions(self, patient_name: str, limit: int = 30) -> List[Dict[str, Any]]:
+    def get_patient_conditions(self, patient_name: str, limit: int = 30) -> Tuple[List[Dict[str, Any]], str, Dict[str, Any]]:
         """
         Get conditions/diagnoses for a specific patient, limited to most recent entries.
 
@@ -139,7 +137,7 @@ class Neo4jConnection:
             limit: Maximum number of results to return (default: 30)
 
         Returns:
-            List of conditions with details, sorted by most recent encounter date
+            Tuple of (results, query, parameters)
         """
         # Check if the name contains a space (indicating a full name search)
         has_space = ' ' in patient_name.strip()
@@ -173,7 +171,7 @@ class Neo4jConnection:
         return self.execute_query(query, {"patient_name": patient_name, "limit": limit})
 
     @traceable(name="get_patient_medications_db", run_type="tool", tags=["neo4j", "patient", "medications"])
-    def get_patient_medications(self, patient_name: str, limit: int = 30) -> List[Dict[str, Any]]:
+    def get_patient_medications(self, patient_name: str, limit: int = 30) -> Tuple[List[Dict[str, Any]], str, Dict[str, Any]]:
         """
         Get medications for a specific patient, limited to most recent entries.
 
@@ -182,7 +180,7 @@ class Neo4jConnection:
             limit: Maximum number of results to return (default: 30)
 
         Returns:
-            List of medications with details, sorted by most recent prescription date
+            Tuple of (results, query, parameters)
         """
         # Check if the name contains a space (indicating a full name search)
         has_space = ' ' in patient_name.strip()
@@ -216,7 +214,7 @@ class Neo4jConnection:
         return self.execute_query(query, {"patient_name": patient_name, "limit": limit})
 
     @traceable(name="get_patient_encounters_db", run_type="tool", tags=["neo4j", "patient", "encounters"])
-    def get_patient_encounters(self, patient_name: str, limit: int = 30) -> List[Dict[str, Any]]:
+    def get_patient_encounters(self, patient_name: str, limit: int = 30) -> Tuple[List[Dict[str, Any]], str, Dict[str, Any]]:
         """
         Get encounters for a specific patient, limited to most recent entries.
 
@@ -225,7 +223,7 @@ class Neo4jConnection:
             limit: Maximum number of results to return (default: 30)
 
         Returns:
-            List of encounters with details, sorted by most recent encounter date
+            Tuple of (results, query, parameters)
         """
         # Check if the name contains a space (indicating a full name search)
         has_space = ' ' in patient_name.strip()
@@ -261,7 +259,7 @@ class Neo4jConnection:
         return self.execute_query(query, {"patient_name": patient_name, "limit": limit})
 
     @traceable(name="search_patients_db", run_type="tool", tags=["neo4j", "patient", "search"])
-    def search_patients(self, name: str = None, limit: int = 30) -> List[Dict[str, Any]]:
+    def search_patients(self, name: str = None, limit: int = 30) -> Tuple[List[Dict[str, Any]], str, Dict[str, Any]]:
         """
         Search for patients by name, sorted by relevance using Levenshtein distance.
 
@@ -270,7 +268,7 @@ class Neo4jConnection:
             limit: Maximum number of results to return (default: 30)
 
         Returns:
-            List of matching patients, sorted by name similarity to search term
+            Tuple of (results, query, parameters)
         """
         if name:
             # Check if the name contains a space (indicating a full name search)
@@ -306,7 +304,7 @@ class Neo4jConnection:
                 LIMIT 200
                 """
 
-            results = self.execute_query(query, {"name": name})
+            results, executed_query, params = self.execute_query(query, {"name": name})
 
             # Calculate Levenshtein distance and sort by similarity
             from difflib import SequenceMatcher
@@ -331,7 +329,7 @@ class Neo4jConnection:
                 if 'latest_encounter' in result:
                     del result['latest_encounter']
 
-            return results
+            return (results, executed_query, params)
         else:
             # No name provided, just return recent patients
             query = """
@@ -356,25 +354,29 @@ class Neo4jConnection:
             cypher_query: Valid Cypher query string
 
         Returns:
-            Dictionary with success status, results, and any error messages
+            Dictionary with success status, results, query info, and any error messages
         """
         try:
             # Execute the query
-            results = self.execute_query(cypher_query)
+            results, executed_query, params = self.execute_query(cypher_query)
 
             if not results:
                 return {
                     "success": True,
                     "results": [],
                     "message": "Query executed successfully but returned no results.",
-                    "result_count": 0
+                    "result_count": 0,
+                    "query": executed_query,
+                    "params": params
                 }
 
             return {
                 "success": True,
                 "results": results,
                 "message": f"Query executed successfully. Found {len(results)} results.",
-                "result_count": len(results)
+                "result_count": len(results),
+                "query": executed_query,
+                "params": params
             }
 
         except Exception as e:
@@ -402,7 +404,7 @@ class Neo4jConnection:
 
         Main Entities:
         - Patient: Stores patient demographic information (firstName, lastName, birthDate, etc.)
-        - Encounter: Healthcare encounters (date, description, type)
+        - Encounter: Healthcare encounters (date, description, type, totalCost - financial cost of encounter)
         - Procedure: Medical procedures performed
         - Condition: Medical conditions/diagnoses
         - Drug: Medications prescribed
@@ -421,4 +423,5 @@ class Neo4jConnection:
         - To find patient procedures: Patient -> Encounter -> Procedure
         - To find patient conditions: Patient -> Encounter -> Condition
         - To find patient medications: Patient -> Encounter -> Drug
+        - To find treatment costs: Patient -> Encounter (access totalCost property)
         """

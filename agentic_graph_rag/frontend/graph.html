@@ -283,7 +283,7 @@
                     </div>
                     <div class="legend-item">
                         <div class="legend-color" style="background: #2196F3;"></div>
-                        <span>Router/Decision</span>
+                        <span>Validation</span>
                     </div>
                     <div class="legend-item">
                         <div class="legend-color" style="background: #FF9800;"></div>
@@ -291,11 +291,15 @@
                     </div>
                     <div class="legend-item">
                         <div class="legend-color" style="background: #9C27B0;"></div>
-                        <span>Tool Execution</span>
+                        <span>Tool</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #E91E63;"></div>
+                        <span>Cypher Agent</span>
                     </div>
                     <div class="legend-item">
                         <div class="legend-color" style="background: #F44336;"></div>
-                        <span>Subgraph</span>
+                        <span>Custom Query Tool</span>
                     </div>
                 </div>
 
@@ -304,6 +308,10 @@
                     <div class="legend-item">
                         <div class="legend-line" style="background: #666;"></div>
                         <span>Regular Edge</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-line" style="background: #666; height: 2px;" style="border-top: 2px dashed #666; background: transparent;"></div>
+                        <span>Return Edge</span>
                     </div>
                     <div class="legend-item">
                         <div class="legend-line" style="background: #FF5722; height: 4px;"></div>
@@ -315,41 +323,65 @@
                     <h3>Main Graph Nodes</h3>
                     <div class="node-list">
                         <div class="node-item">
-                            <strong>router</strong><br>
-                            Classifies queries as standard or analytics
+                            <strong>validation</strong><br>
+                            Validates query relevance to Synthea database
                         </div>
                         <div class="node-item">
                             <strong>agent</strong><br>
-                            Main LLM agent with tool-calling
+                            Main LLM agent with tool-calling capabilities
+                        </div>
+                    </div>
+                </div>
+
+                <div class="info-section">
+                    <h3>Available Tools</h3>
+                    <div class="node-list">
+                        <div class="node-item">
+                            <strong>get_patient_procedures</strong><br>
+                            Retrieves patient procedures
                         </div>
                         <div class="node-item">
-                            <strong>tools</strong><br>
-                            Executes patient query tools
+                            <strong>get_patient_conditions</strong><br>
+                            Gets patient conditions/diagnoses
                         </div>
                         <div class="node-item">
-                            <strong>cypher</strong><br>
-                            Complex analytics subgraph
+                            <strong>get_patient_medications</strong><br>
+                            Retrieves prescribed medications
                         </div>
                         <div class="node-item">
-                            <strong>summary</strong><br>
-                            Synthesizes results into response
+                            <strong>get_patient_encounters</strong><br>
+                            Gets healthcare encounters
+                        </div>
+                        <div class="node-item">
+                            <strong>search_patients</strong><br>
+                            Searches for patients by name
+                        </div>
+                        <div class="node-item">
+                            <strong>get_database_schema</strong><br>
+                            Returns database schema info
+                        </div>
+                        <div class="node-item" style="border-left-color: #F44336;">
+                            <strong>execute_custom_query</strong><br>
+                            Custom analytics via Cypher subgraph
                         </div>
                     </div>
                 </div>
 
                 <div class="subgraph-section">
-                    <h4>Cypher Subgraph</h4>
+                    <h4>Cypher Subgraph (inside execute_custom_query)</h4>
                     <p style="font-size: 12px; color: #5c6bc0;">
-                        <strong>cypher_generator:</strong> Generates Cypher queries<br>
-                        <strong>execute_query:</strong> Executes queries and loops back
+                        <strong>Cypher Agent:</strong> LLM that generates Cypher queries<br>
+                        <strong>execute_cypher_query:</strong> Executes queries and loops back for refinement
                     </p>
                 </div>
 
                 <div class="info-section">
                     <h3>About</h3>
-                    <p>This visualization shows the LangGraph workflow structure used by the agentic system.</p>
-                    <p><strong>Conditional edges</strong> (thicker, orange) route based on query classification or tool requirements.</p>
-                    <p><strong>Regular edges</strong> (thin, gray) represent fixed transitions.</p>
+                    <p>This visualization shows the current LangGraph workflow architecture.</p>
+                    <p><strong>Flow:</strong> START → validation → agent → tools → agent (synthesis) → END</p>
+                    <p><strong>Conditional edges</strong> (thick, orange) represent dynamic routing decisions by the agent.</p>
+                    <p><strong>Regular edges</strong> (thin, solid) represent unconditional transitions.</p>
+                    <p><strong>Return edges</strong> (dashed) show tools returning results to the agent for synthesis.</p>
                 </div>
             </div>
 
@@ -373,52 +405,75 @@
         const nodes = new vis.DataSet([
             // Main graph nodes
             { id: 'START', label: 'START', color: '#4CAF50', shape: 'box', font: { color: 'white', size: 16, face: 'monospace' } },
-            { id: 'router', label: 'ROUTER\n(classify query)', color: '#2196F3', shape: 'box', font: { color: 'white', size: 14 } },
+            { id: 'validation', label: 'VALIDATION\n(check relevance)', color: '#2196F3', shape: 'box', font: { color: 'white', size: 14 } },
             { id: 'agent', label: 'AGENT\n(LLM + tools)', color: '#FF9800', shape: 'box', font: { color: 'white', size: 14 } },
-            { id: 'tools', label: 'TOOLS\n(execute)', color: '#9C27B0', shape: 'box', font: { color: 'white', size: 14 } },
-            { id: 'cypher', label: 'CYPHER\n(subgraph)', color: '#F44336', shape: 'box', font: { color: 'white', size: 14 } },
-            { id: 'summary', label: 'SUMMARY\n(synthesize)', color: '#FF9800', shape: 'box', font: { color: 'white', size: 14 } },
             { id: 'END', label: 'END', color: '#4CAF50', shape: 'box', font: { color: 'white', size: 16, face: 'monospace' } },
 
-            // Cypher subgraph nodes (positioned separately)
-            { id: 'cypher_start', label: 'CYPHER\nSTART', color: '#4CAF50', shape: 'ellipse', font: { color: 'white', size: 12 } },
-            { id: 'cypher_generator', label: 'CYPHER\nGENERATOR', color: '#E91E63', shape: 'box', font: { color: 'white', size: 12 } },
-            { id: 'execute_query', label: 'EXECUTE\nQUERY', color: '#9C27B0', shape: 'box', font: { color: 'white', size: 12 } },
-            { id: 'cypher_end', label: 'CYPHER\nEND', color: '#4CAF50', shape: 'ellipse', font: { color: 'white', size: 12 } }
+            // Tool nodes (individual tools)
+            { id: 'get_patient_procedures', label: 'get_patient_\nprocedures', color: '#9C27B0', shape: 'box', font: { color: 'white', size: 12 } },
+            { id: 'get_patient_conditions', label: 'get_patient_\nconditions', color: '#9C27B0', shape: 'box', font: { color: 'white', size: 12 } },
+            { id: 'get_patient_medications', label: 'get_patient_\nmedications', color: '#9C27B0', shape: 'box', font: { color: 'white', size: 12 } },
+            { id: 'get_patient_encounters', label: 'get_patient_\nencounters', color: '#9C27B0', shape: 'box', font: { color: 'white', size: 12 } },
+            { id: 'search_patients', label: 'search_patients', color: '#9C27B0', shape: 'box', font: { color: 'white', size: 12 } },
+            { id: 'get_database_schema', label: 'get_database_\nschema', color: '#9C27B0', shape: 'box', font: { color: 'white', size: 12 } },
+            { id: 'execute_custom_query', label: 'execute_custom_\nquery', color: '#F44336', shape: 'box', font: { color: 'white', size: 12 } },
+
+            // Cypher subgraph nodes (inside execute_custom_query)
+            { id: 'cypher_agent', label: 'Cypher Agent\n(LLM)', color: '#E91E63', shape: 'box', font: { color: 'white', size: 11 } },
+            { id: 'execute_cypher', label: 'execute_cypher_\nquery', color: '#9C27B0', shape: 'box', font: { color: 'white', size: 11 } }
         ]);
 
         const edges = new vis.DataSet([
-            // Main graph edges
-            { from: 'START', to: 'router', arrows: 'to', width: 2, color: { color: '#666' } },
+            // Main graph edges - START to validation
+            { from: 'START', to: 'validation', arrows: 'to', width: 2, color: { color: '#666' } },
 
-            // Conditional edges from router (thicker, different color)
-            { from: 'router', to: 'agent', arrows: 'to', width: 4, color: { color: '#FF5722' },
-              label: 'standard_tools', font: { align: 'top', size: 11 }, smooth: { type: 'curvedCW', roundness: 0.2 } },
-            { from: 'router', to: 'cypher', arrows: 'to', width: 4, color: { color: '#FF5722' },
-              label: 'custom_analytics', font: { align: 'top', size: 11 }, smooth: { type: 'curvedCW', roundness: 0.2 } },
+            // Conditional edges from validation
+            { from: 'validation', to: 'agent', arrows: 'to', width: 4, color: { color: '#FF5722' },
+              label: 'relevant', font: { align: 'top', size: 11 }, smooth: { type: 'curvedCW', roundness: 0.2 } },
+            { from: 'validation', to: 'END', arrows: 'to', width: 4, color: { color: '#FF5722' },
+              label: 'not relevant', font: { align: 'top', size: 11 }, smooth: { type: 'curvedCW', roundness: -0.2 } },
 
-            // Conditional edges from agent (thicker, different color)
-            { from: 'agent', to: 'tools', arrows: 'to', width: 4, color: { color: '#FF5722' },
-              label: 'has tool calls', font: { align: 'top', size: 11 }, smooth: { type: 'curvedCW', roundness: 0.2 } },
-            { from: 'agent', to: 'summary', arrows: 'to', width: 4, color: { color: '#FF5722' },
-              label: 'no tools', font: { align: 'top', size: 11 }, smooth: { type: 'curvedCW', roundness: -0.2 } },
+            // Conditional edges from agent to tools (showing as individual tools)
+            { from: 'agent', to: 'get_patient_procedures', arrows: 'to', width: 4, color: { color: '#FF5722' },
+              smooth: { type: 'curvedCW', roundness: 0.3 } },
+            { from: 'agent', to: 'get_patient_conditions', arrows: 'to', width: 4, color: { color: '#FF5722' },
+              smooth: { type: 'curvedCW', roundness: 0.2 } },
+            { from: 'agent', to: 'get_patient_medications', arrows: 'to', width: 4, color: { color: '#FF5722' },
+              smooth: { type: 'curvedCW', roundness: 0.1 } },
+            { from: 'agent', to: 'get_patient_encounters', arrows: 'to', width: 4, color: { color: '#FF5722' },
+              smooth: { type: 'curvedCW', roundness: 0 } },
+            { from: 'agent', to: 'search_patients', arrows: 'to', width: 4, color: { color: '#FF5722' },
+              smooth: { type: 'curvedCW', roundness: -0.1 } },
+            { from: 'agent', to: 'get_database_schema', arrows: 'to', width: 4, color: { color: '#FF5722' },
+              smooth: { type: 'curvedCW', roundness: -0.2 } },
+            { from: 'agent', to: 'execute_custom_query', arrows: 'to', width: 4, color: { color: '#FF5722' },
+              smooth: { type: 'curvedCW', roundness: -0.3 } },
 
-            // Regular edges
-            { from: 'tools', to: 'summary', arrows: 'to', width: 2, color: { color: '#666' } },
-            { from: 'cypher', to: 'summary', arrows: 'to', width: 2, color: { color: '#666' } },
-            { from: 'summary', to: 'END', arrows: 'to', width: 2, color: { color: '#666' } },
+            // Conditional edge from agent directly to END (when no tools needed)
+            { from: 'agent', to: 'END', arrows: 'to', width: 4, color: { color: '#FF5722' },
+              label: 'no tools', font: { align: 'top', size: 11 }, smooth: { type: 'curvedCW', roundness: -0.4 } },
 
-            // Cypher subgraph edges
-            { from: 'cypher_start', to: 'cypher_generator', arrows: 'to', width: 2, color: { color: '#666' } },
+            // Return edges from tools back to agent (for synthesis)
+            { from: 'get_patient_procedures', to: 'agent', arrows: 'to', width: 2, color: { color: '#666' },
+              smooth: { type: 'curvedCW', roundness: -0.3 }, dashes: true },
+            { from: 'get_patient_conditions', to: 'agent', arrows: 'to', width: 2, color: { color: '#666' },
+              smooth: { type: 'curvedCW', roundness: -0.2 }, dashes: true },
+            { from: 'get_patient_medications', to: 'agent', arrows: 'to', width: 2, color: { color: '#666' },
+              smooth: { type: 'curvedCW', roundness: -0.1 }, dashes: true },
+            { from: 'get_patient_encounters', to: 'agent', arrows: 'to', width: 2, color: { color: '#666' },
+              smooth: { type: 'curvedCW', roundness: 0 }, dashes: true },
+            { from: 'search_patients', to: 'agent', arrows: 'to', width: 2, color: { color: '#666' },
+              smooth: { type: 'curvedCW', roundness: 0.1 }, dashes: true },
+            { from: 'get_database_schema', to: 'agent', arrows: 'to', width: 2, color: { color: '#666' },
+              smooth: { type: 'curvedCW', roundness: 0.2 }, dashes: true },
+            { from: 'execute_custom_query', to: 'agent', arrows: 'to', width: 2, color: { color: '#666' },
+              smooth: { type: 'curvedCW', roundness: 0.3 }, dashes: true },
 
-            // Conditional edges in subgraph
-            { from: 'cypher_generator', to: 'execute_query', arrows: 'to', width: 4, color: { color: '#FF5722' },
-              label: 'has tools', font: { align: 'top', size: 10 }, smooth: { type: 'curvedCW', roundness: 0.3 } },
-            { from: 'cypher_generator', to: 'cypher_end', arrows: 'to', width: 4, color: { color: '#FF5722' },
-              label: 'no tools', font: { align: 'top', size: 10 }, smooth: { type: 'curvedCW', roundness: -0.3 } },
-
-            // Loop back edge in subgraph
-            { from: 'execute_query', to: 'cypher_generator', arrows: 'to', width: 2, color: { color: '#666' },
+            // Cypher subgraph edges (within execute_custom_query)
+            { from: 'execute_custom_query', to: 'cypher_agent', arrows: 'to', width: 2, color: { color: '#F44336' },
+              label: 'subgraph', font: { align: 'top', size: 10, color: '#F44336' }, smooth: { type: 'curvedCW', roundness: 0.5 } },
+            { from: 'cypher_agent', to: 'execute_cypher', arrows: 'to', width: 2, color: { color: '#666' } },
+            { from: 'execute_cypher', to: 'cypher_agent', arrows: 'to', width: 2, color: { color: '#666' },
               label: 'loop', font: { align: 'top', size: 10 }, smooth: { type: 'curvedCW', roundness: 0.5 }, dashes: true }
         ]);
 
@@ -542,45 +597,53 @@
                     title: 'START',
                     description: 'Entry point of the main agent workflow.'
                 },
-                'router': {
-                    title: 'Router Node',
-                    description: 'Classifies incoming queries as either:<ul class="tooltip-list"><li>"standard_tools": Direct patient queries</li><li>"custom_analytics": Complex analytics requiring Cypher</li></ul>'
+                'validation': {
+                    title: 'Validation Node',
+                    description: 'Validates whether the user query is relevant to the Synthea medical database. Routes to agent if relevant, otherwise returns rejection message and ends.'
                 },
                 'agent': {
                     title: 'Agent Node',
-                    description: 'Main LLM-based agent with tool-calling capabilities. Has access to tools for querying patient data:<ul class="tooltip-list"><li>get_patient_procedures()</li><li>get_patient_conditions()</li><li>get_patient_medications()</li><li>get_patient_encounters()</li><li>search_patients()</li><li>get_database_schema()</li></ul>'
+                    description: 'Main LLM-based agent with tool-calling capabilities. Selects appropriate tools based on user query, then synthesizes tool results into natural language responses.<ul class="tooltip-list"><li>First call: Tool selection</li><li>Second call: Result synthesis</li></ul>'
                 },
-                'tools': {
-                    title: 'Tools Node',
-                    description: 'Executes tool calls from the agent and tracks all Cypher queries executed.'
+                'get_patient_procedures': {
+                    title: 'get_patient_procedures Tool',
+                    description: 'Retrieves procedures performed on a patient, sorted by most recent first. Returns up to 30 results by default.'
                 },
-                'cypher': {
-                    title: 'Cypher Subgraph',
-                    description: 'Handles complex analytics queries. Contains its own internal workflow with iterative query generation and execution.'
+                'get_patient_conditions': {
+                    title: 'get_patient_conditions Tool',
+                    description: 'Gets medical conditions/diagnoses for a patient, sorted by most recent first.'
                 },
-                'summary': {
-                    title: 'Summary Node',
-                    description: 'Synthesizes tool and query results into a natural language response. This is the final step before returning to the user.'
+                'get_patient_medications': {
+                    title: 'get_patient_medications Tool',
+                    description: 'Retrieves medications prescribed to a patient, sorted by most recent first.'
+                },
+                'get_patient_encounters': {
+                    title: 'get_patient_encounters Tool',
+                    description: 'Gets healthcare encounters (visits) for a patient, sorted by most recent first.'
+                },
+                'search_patients': {
+                    title: 'search_patients Tool',
+                    description: 'Searches for patients by name. Returns matching patients sorted by relevance.'
+                },
+                'get_database_schema': {
+                    title: 'get_database_schema Tool',
+                    description: 'Returns information about the database schema and structure.'
+                },
+                'execute_custom_query': {
+                    title: 'execute_custom_query Tool',
+                    description: 'Handles complex analytics queries using a Cypher subgraph. Used for:<ul class="tooltip-list"><li>Aggregations and counts</li><li>Top-N queries</li><li>Time-based analysis</li><li>Multi-entity relationships</li><li>Provider/organization queries</li></ul>'
+                },
+                'cypher_agent': {
+                    title: 'Cypher Agent (Subgraph)',
+                    description: 'LLM-based agent specialized in generating Cypher queries for the Synthea database. Has deep knowledge of the database schema and constructs optimized queries.'
+                },
+                'execute_cypher': {
+                    title: 'execute_cypher_query Tool',
+                    description: 'Executes the generated Cypher query against Neo4j database. Results are returned to the Cypher Agent, which can refine the query if needed (loop back).'
                 },
                 'END': {
                     title: 'END',
-                    description: 'End point - returns response to user.'
-                },
-                'cypher_start': {
-                    title: 'Cypher Subgraph Start',
-                    description: 'Entry point of the Cypher subgraph for complex analytics.'
-                },
-                'cypher_generator': {
-                    title: 'Cypher Generator',
-                    description: 'LLM-based node that analyzes the user question, generates appropriate Cypher queries, and provides explanations.'
-                },
-                'execute_query': {
-                    title: 'Execute Query',
-                    description: 'Executes the generated Cypher query against the database, formats results, and loops back to the generator for refinement if needed.'
-                },
-                'cypher_end': {
-                    title: 'Cypher Subgraph End',
-                    description: 'Exit point of the Cypher subgraph.'
+                    description: 'End point - returns final response to user.'
                 }
             };
 

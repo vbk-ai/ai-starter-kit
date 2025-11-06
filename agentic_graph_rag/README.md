@@ -145,22 +145,24 @@ Open your browser and go to: **http://localhost:8000/app**
 ## Key Features
 
 - **Natural Language Queries**: Ask questions in plain English about patient records
-- **LangGraph Agent**: Uses LangGraph with ToolNode for intelligent query routing
-- **Cypher Subagent**: Specialized AI agent for constructing custom Cypher queries for complex questions
+- **LangGraph Agent**: Streamlined workflow with validation, tool selection, and self-synthesis
+- **Query Validation**: Automatically validates query relevance to medical database before processing
+- **Cypher Subagent**: Specialized AI agent (subgraph) for constructing custom Cypher queries within the execute_custom_query tool
 - **Multi-Provider Support**:
   - Switch between Anthropic and SambaNova providers at runtime via UI dropdown
-  - Provider-specific model configurations (main agent, router, cypher agent)
+  - Provider-specific model configurations (main agent, validation, cypher agent)
   - Seamless provider switching without server restart
 - **Dual-Mode Querying**:
-  - Pre-built tools for common queries (patient procedures, conditions, medications)
-  - Custom query generation for complex analytics and aggregations
+  - Pre-built tools for common queries (patient procedures, conditions, medications, encounters, search)
+  - Custom query generation tool with Cypher subgraph for complex analytics
 - **Flexible Patient Matching**: Query by first name, last name, or full name
 - **Neo4j Integration**: Directly queries the Synthea-sample database
 - **RESTful API**: FastAPI backend with automatic documentation
-- **Modern UI**: Clean, responsive web interface with provider selection
+- **Modern UI**: Clean, responsive web interface with provider selection and graph visualization
 - **Session Management**: Maintains conversation context across multiple queries
 - **Query Transparency**: See all executed Cypher queries in collapsible widgets
 - **Granular Debug Logging**: Four separate logging controls (Agent, Tool, Database, App)
+- **Architecture Visualization**: Interactive LangGraph visualization showing workflow structure
 
 ## Architecture
 
@@ -304,35 +306,42 @@ For analytics, aggregations, and complex questions, the agent uses a specialized
 
 ### How It Works
 
-#### Standard Query Flow
+#### Query Flow (Optimized Architecture)
 1. **User Query**: You type a natural language question
-2. **Main Agent Analysis**: The LangGraph agent analyzes the query
-3. **Tool Selection**: Agent chooses appropriate pre-built tool
-4. **Tool Execution**: Direct Neo4j query via ToolNode
-5. **Response Generation**: LLM synthesizes results into natural language
-6. **Context Maintenance**: Conversation history preserved for follow-ups
+2. **Validation**: Validation node checks if query is relevant to Synthea medical database
+   - **Relevant queries** → Proceed to agent
+   - **Irrelevant queries** → Return rejection message and end
+3. **Agent Analysis**: Main LLM agent analyzes the query and selects appropriate tools
+4. **Tool Execution**: Agent calls one or more tools based on the query:
+   - **Pre-built tools** for common patient queries (procedures, conditions, medications, encounters, search)
+   - **execute_custom_query tool** for complex analytics (triggers Cypher subgraph)
+   - **get_database_schema tool** for schema information
+5. **Result Synthesis**: Agent receives tool results and synthesizes them into natural language
+   - Uses conditional synthesis instruction injection for clarity
+   - Agent self-synthesizes without separate summary node
+6. **Response**: Final answer returned to user with executed queries shown
+7. **Context Maintenance**: Conversation history preserved for follow-ups
 
-#### Complex Query Flow (with Cypher Subgraph)
-1. **User Query**: You ask a complex analytical question
-2. **Router Analysis**: Lightweight router LLM classifies query as "custom_analytics"
-3. **Cypher Subgraph Invocation**: Main agent routes to Cypher node
-4. **Cypher Generation**: Specialized Cypher subgraph constructs custom query
-   - Subgraph has detailed knowledge of Synthea schema (400+ lines)
-   - Generates optimized, safe queries with proper LIMIT clauses
-   - Uses structured output for consistency
-   - Explains what the query does
-5. **Query Execution**: Custom Cypher executed against Neo4j with error handling
-6. **Result Formatting**: Results formatted as readable table
-7. **Response Generation**: Main agent presents results with context
-8. **Query Transparency**: Generated Cypher query shown to user
+#### Cypher Subgraph Flow (within execute_custom_query tool)
+When the agent selects the execute_custom_query tool for complex analytics:
+1. **Subgraph Entry**: Tool invokes internal Cypher subgraph with user question
+2. **Cypher Agent**: Specialized LLM with deep Synthea schema knowledge (400+ lines)
+   - Analyzes the question and generates appropriate Cypher query
+   - Includes LIMIT clauses, optimizations, and safety checks
+3. **Query Execution**: execute_cypher_query tool runs the generated query
+4. **Loop/Refinement**: Results return to Cypher Agent for potential refinement (conditional loop)
+5. **Subgraph Exit**: Final results return to main agent for synthesis
+6. **Query Transparency**: Generated Cypher query tracked and shown to user
 
 **Key Benefits of This Architecture:**
-- Main agent stays lightweight and focused on conversation flow
-- Cypher subgraph has deep schema knowledge and query expertise
-- Separation of concerns: routing → query construction → execution
-- Configurable LLM models for different roles (router, main agent, cypher agent)
-- Custom queries are validated and executed safely with comprehensive error handling
-- Query tracking for debugging and observability
+- **Streamlined flow**: Validation → Agent → Tools → Agent (synthesis) → End
+- **Fewer LLM calls**: 2-3 total (validation + agent tool selection + agent synthesis)
+- **No separate router**: Agent directly selects tools using built-in tool-calling
+- **No separate summary node**: Agent synthesizes its own tool results
+- **Validation first**: Rejects irrelevant queries before processing
+- **Cypher subgraph**: Deep query expertise isolated within execute_custom_query tool
+- **Query tracking**: All queries tracked via Command pattern with reducers
+- **Maintainability**: Clear separation of concerns with subgraph architecture
 
 ## API Endpoints
 
@@ -433,62 +442,108 @@ The Synthea database follows this structure:
 
 ## Agent Tools & Architecture
 
-The main LangGraph agent uses intelligent routing to direct queries to the appropriate handler:
+The main LangGraph agent uses a streamlined architecture with validation, tool selection, and self-synthesis:
 
-### Query Routing
-The agent classifies each query into one of four routes:
-1. **standard_tools**: Patient-specific queries → Uses pre-built tools
-2. **custom_analytics**: Complex analytical queries → Routes to Cypher subgraph
-3. **conversational**: Greetings, thanks, farewells → Direct response
-4. **schema_info**: Database structure questions → Uses schema tool
+### Architecture Overview
+```
+START → Validation → Agent → Tools → Agent (synthesis) → END
+                      ↓ (if not relevant)
+                      END
+```
 
-### Standard Tools (Pre-built Queries)
-1. **get_patient_procedures**: Retrieve patient procedures (with configurable limit)
-2. **get_patient_conditions**: Retrieve patient conditions (with configurable limit)
-3. **get_patient_medications**: Retrieve patient medications (with configurable limit)
-4. **get_patient_encounters**: Retrieve patient encounters (with configurable limit)
-5. **search_patients**: Search for patients by name
+### Main Graph Nodes
+1. **Validation Node**: Entry point that validates query relevance to Synthea database
+   - Uses lightweight validation LLM with structured output
+   - Routes relevant queries to agent, rejects irrelevant queries
+2. **Agent Node**: Main LLM with tool-calling capabilities
+   - First invocation: Analyzes query and selects appropriate tools
+   - Second invocation: Synthesizes tool results into natural language
+   - No separate router or summary nodes needed
+
+### Available Tools
+The agent has access to 7 tools (all shown as individual nodes in the graph visualization):
+
+#### Pre-built Patient Query Tools
+1. **get_patient_procedures**: Retrieve patient procedures (limit: 30)
+2. **get_patient_conditions**: Retrieve patient conditions (limit: 30)
+3. **get_patient_medications**: Retrieve patient medications (limit: 30)
+4. **get_patient_encounters**: Retrieve patient encounters (limit: 30)
+5. **search_patients**: Search for patients by name (limit: 30)
 6. **get_database_schema**: Get database schema information
 
-### Cypher Subgraph (Complex Analytics)
-For complex analytical queries, the agent routes to a separate Cypher subgraph that:
-- Uses a specialized LLM agent (configured via CYPHER_AGENT_MODEL) with comprehensive Synthea schema knowledge
-- Constructs safe, optimized Cypher queries with proper LIMIT clauses
-- Handles analytics, aggregations, and multi-entity queries
-- Provides query explanations and transparency
-- Returns formatted results to the main agent
+#### Custom Analytics Tool (with Cypher Subgraph)
+7. **execute_custom_query**: Handles complex analytics using internal Cypher subgraph
+   - Contains its own specialized Cypher Agent (LLM with deep schema knowledge)
+   - Internal execute_cypher_query tool for query execution
+   - Unconditional edge from Cypher Agent → execute_cypher_query
+   - Loop-back edge for query refinement
+   - Handles: aggregations, analytics, multi-entity queries, time-based analysis
 
-### Graph Structure
+### Conditional Edges
+- **From Validation**: Routes to Agent (relevant) or END (not relevant)
+- **From Agent to Tools**: Conditional edges to each of the 7 tools based on query analysis
+- **From Agent to END**: Direct edge when no tools needed
+- **From Tools to Agent**: Return edges (dashed) for result synthesis
+
+### Graph Structure (Current)
 ```
-User Query → Agent (Routing)
-             ├── standard_tools → Tool Node → Agent
-             ├── custom_analytics → Cypher Subgraph → Agent
-             ├── conversational → Direct Response → END
-             └── schema_info → Schema Tool → Agent
+START
+  ↓
+Validation
+  ├─(relevant)──→ Agent ─┬─→ get_patient_procedures ──┐
+  │                      ├─→ get_patient_conditions ───┤
+  │                      ├─→ get_patient_medications ──┤
+  └─(not relevant)─→ END ├─→ get_patient_encounters ───├─→ Agent (synthesis) → END
+                         ├─→ search_patients ──────────┤
+                         ├─→ get_database_schema ──────┤
+                         ├─→ execute_custom_query ─────┘
+                         │    (contains Cypher subgraph)
+                         └─(no tools)──→ END
+
+execute_custom_query (expanded):
+  ┌─────────────────────────────────────┐
+  │ Cypher Agent → execute_cypher_query │
+  │       ↑               │              │
+  │       └───(loop)──────┘              │
+  └─────────────────────────────────────┘
 ```
+
+### Architecture Visualization
+View the interactive graph visualization at: **http://localhost:8000/graph**
+- Shows all nodes (validation, agent, 7 tools, Cypher subgraph internals)
+- Displays conditional edges (thick orange) vs regular edges (thin gray)
+- Return edges (dashed) showing tool → agent flow
+- Click nodes for detailed tooltips
+- Expanded view of Cypher subgraph within execute_custom_query tool
 
 ## Cypher Subagent Technical Guide
 
 ### Overview
 
-The Cypher Subagent is a specialized AI agent that constructs custom Cypher queries for complex questions that don't fit the pre-built query tools. It operates as a sub-component of the main LangGraph agent.
+The Cypher Subagent is a specialized AI agent (implemented as a LangGraph subgraph) that constructs custom Cypher queries for complex analytics questions. It operates **within** the execute_custom_query tool as an internal subgraph.
 
 ### Architecture Flow
 
 ```
 User Question
     ↓
-Router LLM (Classify Query Intent)
+Validation Node (Check Relevance)
+    ↓ (if relevant)
+Agent Node (Tool Selection)
+    ↓ (selects execute_custom_query for analytics)
+execute_custom_query Tool
     ↓
-[standard_tools | custom_analytics | conversational | schema_info]
-    ↓ custom_analytics
-Cypher Subgraph (Configured LLM)
+Cypher Subgraph Invocation
+    ├─→ Cypher Agent (Generate Query)
+    └─→ execute_cypher_query Tool
+         ├─→ Neo4j Database
+         └─→ Loop back to Cypher Agent (if needed)
     ↓
-[Generate Cypher Query]
+Results Return to Main Agent
     ↓
-Neo4j Database
+Agent Synthesizes Response
     ↓
-Results → Main Agent → User
+User
 ```
 
 ### Key Features
@@ -509,17 +564,18 @@ The Cypher subagent has a comprehensive 400+ line system prompt that includes:
 - **Explains** what the query does
 - **Formats** results as readable tables
 
-#### 3. Intelligent Tool Routing
-The main agent knows when to delegate to the subagent:
+#### 3. Intelligent Tool Selection
+The main agent knows when to select execute_custom_query (which triggers the Cypher subgraph):
 - Analytics and aggregations
 - Provider/organization queries
 - Time-based analysis
 - Multi-entity relationships
 - Complex filtering/grouping
+- Statistical queries and counts
 
 ### When the Subagraph is Used
 
-#### Routes to Cypher Subgraph (custom_analytics)
+#### Agent Selects execute_custom_query (triggers Cypher Subgraph)
 - "Which providers treated the most patients?"
 - "What's the most common procedure?"
 - "How many emergency visits in 2023?"
@@ -527,10 +583,11 @@ The main agent knows when to delegate to the subagent:
 - "Average age of patients with heart conditions"
 - "Count encounters by type"
 
-#### Routes to Standard Tools
+#### Agent Selects Standard Tools
 - "What procedures has Ethan766 had?" → get_patient_procedures
 - "List medications for John" → get_patient_medications
 - "Find patients named Smith" → search_patients
+- "What encounters did Sarah have?" → get_patient_encounters
 
 ### Schema Knowledge in Subagent
 
@@ -607,66 +664,92 @@ Cypher Query Used:
 #### File Structure
 ```
 backend/
-├── cypher_subagent.py       # Cypher query generator subgraph
-├── agent.py                 # Main agent with routing logic
+├── agent.py                 # Main agent with validation, tools, and execute_custom_query
+├── cypher_subagent.py       # Cypher query generator subgraph (invoked by execute_custom_query)
 └── neo4j_utils.py          # Database utilities and execute_custom_cypher method
 ```
 
 #### Key Components
 
-**1. Cypher Subagent** ([cypher_subagent.py](backend/cypher_subagent.py))
+**1. execute_custom_query Tool** ([agent.py](backend/agent.py))
 ```python
-def query_cypher_subgraph(user_question: str):
+@tool
+def execute_custom_query(user_question: str, tool_call_id: ...) -> Command:
     """
-    Query the Cypher subgraph to generate and execute a custom Cypher query.
-    Uses configured CYPHER_AGENT_MODEL with comprehensive schema knowledge.
-    Returns structured output with query, explanation, and results.
+    Execute a custom database query for questions that don't fit standard tools.
+    This tool uses a specialized Cypher subgraph to construct and execute queries.
+
+    Invokes the Cypher subgraph, extracts results, and returns as Command.
     """
 ```
 
-**2. Cypher Node** ([agent.py](backend/agent.py))
+**2. Cypher Subgraph** ([cypher_subagent.py](backend/cypher_subagent.py))
 ```python
-def cypher_node(state: AgentState) -> dict:
+def get_cypher_subgraph():
     """
-    LangGraph node that handles custom analytics queries.
-    1. Extracts user question from state
-    2. Calls Cypher subgraph to generate and execute query
-    3. Returns results as AI message back to agent
+    Returns the compiled Cypher subgraph (singleton).
+
+    Subgraph structure:
+    - cypher_generator node: LLM that generates Cypher queries
+    - execute_query node: ToolNode that executes queries
+    - Conditional routing based on tool calls
+    - Loop back for query refinement
     """
 ```
 
-**3. Custom Cypher Executor** ([neo4j_utils.py](backend/neo4j_utils.py))
+**3. Cypher Agent Node** ([cypher_subagent.py](backend/cypher_subagent.py))
 ```python
-def execute_custom_cypher(self, cypher_query: str):
-    # Safe execution with error handling
-    # Returns: {success, results, message, result_count}
+def call_cypher_generator(state: CypherSubgraphState) -> dict:
+    """
+    LLM-based node with 400+ line schema prompt.
+    Generates Cypher queries using execute_cypher_query tool.
+    Returns messages with generated query for tracking.
+    """
+```
+
+**4. execute_cypher_query Tool** ([cypher_subagent.py](backend/cypher_subagent.py))
+```python
+@tool
+def execute_cypher_query(cypher_query: str) -> str:
+    """
+    Executes generated Cypher query against Neo4j.
+    Returns formatted table results.
+    Called by Cypher Agent within subgraph.
+    """
 ```
 
 ### Benefits of This Architecture
 
 #### 1. Separation of Concerns
-- **Main Agent**: Routes queries, maintains conversation, synthesizes responses
-- **Cypher Subagent**: Expert in query construction, schema knowledge
+- **Main Agent**: Selects tools, maintains conversation, synthesizes responses
+- **Validation Node**: Filters irrelevant queries before processing
+- **Cypher Subagent**: Isolated expert in query construction within execute_custom_query tool
+- **Tools**: Each has single responsibility (procedures, conditions, medications, etc.)
 
 #### 2. Cost Optimization
+- Validation: Fast relevance check prevents processing irrelevant queries
 - Standard queries: Fast, minimal LLM usage (pre-built queries)
-- Complex queries: Uses Cypher agent LLM only when needed
-- Router: Lightweight model (Haiku) for classification
+- Complex queries: Cypher subagent LLM only used when execute_custom_query tool is selected
+- Fewer LLM calls: No separate router or summary nodes (2-3 calls total)
 
 #### 3. Maintainability
-- Schema changes: Update subagent prompt only
-- New query types: Add examples to subagent
-- Main agent: Stays simple and focused
+- Schema changes: Update Cypher subagent prompt only
+- New query types: Add examples to subagent system prompt
+- Main agent: Stays focused on tool selection and synthesis
+- Tool addition: Just add @tool decorated function to tools list
 
 #### 4. Safety
-- Queries validated before execution
-- LIMIT clauses enforced
+- Validation prevents irrelevant query processing
+- Queries validated before execution in subgraph
+- LIMIT clauses enforced in Cypher generation
 - Error handling at multiple levels
+- Command pattern with reducers for state management
 
 #### 5. Transparency
-- Generated queries shown to user
-- Query explanation provided
-- User can learn Cypher patterns
+- All queries tracked via executed_queries state
+- Generated Cypher queries shown to user
+- Query source tracked (which tool/function)
+- Graph visualization available at /graph endpoint
 
 ### Testing the Subagent
 
@@ -732,10 +815,14 @@ Update the system prompt in `generate_cypher_query()`:
 
 ### Performance Characteristics
 
-- **Query Generation**: 2-5 seconds (Cypher agent LLM call)
+- **Validation**: <1 second (lightweight validation LLM)
+- **Tool Selection**: 2-4 seconds (main agent LLM call)
+- **Standard Tool Execution**: <1 second (pre-built queries)
+- **Cypher Query Generation**: 2-5 seconds (Cypher subagent LLM call within execute_custom_query)
 - **Query Execution**: <1 second (Neo4j)
-- **Total Time**: 3-6 seconds for complex queries
-- **Standard Queries**: 2-5 seconds (direct tool execution)
+- **Result Synthesis**: 2-4 seconds (main agent LLM call)
+- **Total Time (Standard)**: 3-6 seconds (validation + agent + tool + synthesis)
+- **Total Time (Complex)**: 5-10 seconds (validation + agent + Cypher subgraph + synthesis)
 
 ### Security Considerations
 
@@ -757,14 +844,21 @@ Possible improvements:
 
 ### Summary
 
-The Cypher Subagent provides a powerful extension to the chatbot, enabling it to answer complex analytical questions while maintaining:
-- **Safety**: Validated, read-only queries
-- **Efficiency**: Only used when needed
-- **Transparency**: Queries shown to user
-- **Maintainability**: Separate from main agent
-- **Extensibility**: Easy to add new patterns
+The Cypher Subagent (implemented as a subgraph within execute_custom_query tool) provides powerful analytics capabilities while maintaining:
+- **Safety**: Validated, read-only queries with enforced LIMIT clauses
+- **Efficiency**: Only invoked when agent selects execute_custom_query tool
+- **Transparency**: Generated queries tracked and shown to user
+- **Isolation**: Separate subgraph with own state and routing logic
+- **Maintainability**: Deep schema knowledge isolated from main agent
+- **Extensibility**: Easy to add new query patterns to subagent prompt
 
-This dual-agent architecture combines the best of both worlds: fast pre-built queries for common questions, and flexible custom queries for complex analysis.
+This streamlined architecture (validation → agent → tools → synthesis) combines:
+- **Fast pre-built tools** for common patient queries
+- **Flexible Cypher subgraph** (within execute_custom_query) for complex analytics
+- **Validation** to filter irrelevant queries
+- **Self-synthesis** by the agent without separate summary node
+- **Query tracking** via Command pattern with reducers
+- **Visual representation** available at /graph endpoint
 
 ## Deployment
 
@@ -819,20 +913,25 @@ This dual-agent architecture combines the best of both worlds: fast pre-built qu
   - `execute_custom_cypher()` - Execute custom Cypher queries
 
 #### [backend/agent.py](backend/agent.py)
-- LangGraph agent with ToolNode integration
-- 6 standard tools wrapped from neo4j_utils functions
-- Intelligent query routing (standard tools, custom analytics, conversational, schema)
-- Cypher subgraph integration for complex queries
-- Conversation state management with query tracking
+- Streamlined LangGraph agent architecture
+- Validation node (entry point) for query relevance checking
+- Main agent node with tool-calling and self-synthesis capabilities
+- 7 tools including 6 pre-built patient query tools + execute_custom_query
+- execute_custom_query tool invokes Cypher subgraph for complex analytics
+- Conversation state management with Command pattern and reducers
+- Query tracking via executed_queries state with add_queries reducer
 - Configurable LLM support (Anthropic, SambaNova)
-- Iteration limits and reflection loops
+- Conditional edges for validation routing and tool selection
+- Return edges from tools back to agent for synthesis
 
 #### [backend/cypher_subagent.py](backend/cypher_subagent.py)
-- Specialized Cypher query generator
+- Specialized Cypher query generator subgraph (invoked by execute_custom_query)
 - Comprehensive Synthea schema knowledge (400+ lines)
 - LLM-powered query construction (uses configured CYPHER_AGENT_MODEL)
-- Safe query validation and execution
-- Structured output with query explanation
+- Internal structure: cypher_generator node → execute_query node (ToolNode)
+- Conditional routing based on tool calls with loop-back for refinement
+- Safe query validation and execution with LIMIT enforcement
+- Returns formatted results to main agent via execute_custom_query tool
 
 #### [backend/server.py](backend/server.py)
 - FastAPI REST API server
@@ -851,6 +950,17 @@ This dual-agent architecture combines the best of both worlds: fast pre-built qu
 - Session management
 - Status indicators
 - Responsive design
+- Provider selection dropdown
+
+#### [frontend/graph.html](frontend/graph.html)
+- Interactive LangGraph visualization using vis-network
+- Shows complete architecture: validation, agent, 7 tools, Cypher subgraph
+- Displays conditional edges (thick orange) vs regular edges (thin gray)
+- Return edges (dashed) showing tool → agent flow
+- Expandable Cypher subgraph view showing internal structure
+- Click nodes for detailed tooltips with descriptions
+- Controls: Fit view, toggle physics, reset zoom
+- Accessible at /graph endpoint
 
 ### Configuration & Documentation
 
@@ -865,13 +975,18 @@ This dual-agent architecture combines the best of both worlds: fast pre-built qu
 
 ## Key Design Decisions
 
-1. **LangGraph with ToolNode**: Provides structured agent workflow with automatic tool routing
-2. **Pure HTML/JS Frontend**: Minimal dependencies, easy to understand and modify
-3. **Session-based Conversations**: Maintains context without database overhead
-4. **FastAPI**: Modern, fast, with automatic API documentation
-5. **Direct Neo4j Queries**: No ORM overhead, optimal for graph traversal
-6. **Environment Variables**: Secure configuration management
-7. **Dual-Agent Architecture**: Main agent for routing, Cypher subagent for complex queries
+1. **Streamlined LangGraph Architecture**: Validation → Agent → Tools → Synthesis flow
+2. **Validation-First**: Relevance checking before query processing
+3. **Agent Self-Synthesis**: No separate summary node, agent synthesizes own results
+4. **Command Pattern**: Tools return Command objects for state updates with reducers
+5. **Cypher Subgraph**: Isolated within execute_custom_query tool as internal subgraph
+6. **Pure HTML/JS Frontend**: Minimal dependencies, easy to understand and modify
+7. **Session-based Conversations**: Maintains context without database overhead
+8. **FastAPI**: Modern, fast, with automatic API documentation
+9. **Direct Neo4j Queries**: No ORM overhead, optimal for graph traversal
+10. **Environment Variables**: Secure configuration management
+11. **Query Tracking**: All queries tracked via executed_queries state
+12. **Visual Documentation**: Interactive graph visualization at /graph endpoint
 
 ## Extensibility
 

@@ -117,7 +117,7 @@ def get_model_for_role(role: str) -> str:
     Get the configured model for a specific role based on the active provider.
 
     Args:
-        role: The role name - one of 'MAIN_AGENT', 'ROUTER', or 'CYPHER_AGENT'
+        role: The role name - one of 'MAIN_AGENT', 'VALIDATION', or 'CYPHER_AGENT'
 
     Returns:
         Model name for the specified role
@@ -125,27 +125,27 @@ def get_model_for_role(role: str) -> str:
     Raises:
         ValueError: If role is invalid
     """
-    valid_roles = ['MAIN_AGENT', 'ROUTER', 'CYPHER_AGENT']
+    valid_roles = ['MAIN_AGENT', 'VALIDATION', 'CYPHER_AGENT']
     if role not in valid_roles:
         raise ValueError(f"Invalid role: {role}. Must be one of {valid_roles}")
 
     provider = get_provider()
 
     # Build env var name based on provider and role
-    # e.g., ANTHROPIC_MAIN_AGENT_LLM or SAMBANOVA_ROUTER_LLM
+    # e.g., ANTHROPIC_MAIN_AGENT_LLM or SAMBANOVA_VALIDATION_LLM
     env_var = f"{provider.upper()}_{role}_LLM"
 
     # Get default based on provider
     if provider == "anthropic":
         defaults = {
             "MAIN_AGENT": "claude-sonnet-4-5-20250929",
-            "ROUTER": "claude-haiku-4-5-20251001",
+            "VALIDATION": "claude-haiku-4-5-20251001",  # Fast validation with Haiku
             "CYPHER_AGENT": "claude-sonnet-4-5-20250929"
         }
     elif provider == "sambanova":
         defaults = {
             "MAIN_AGENT": "DeepSeek-V3.1",
-            "ROUTER": "DeepSeek-V3.1",
+            "VALIDATION": "DeepSeek-V3.1",
             "CYPHER_AGENT": "DeepSeek-V3.1"
         }
     else:
@@ -159,9 +159,9 @@ def get_main_agent_model() -> str:
     return get_model_for_role("MAIN_AGENT")
 
 
-def get_router_model() -> str:
-    """Get the configured router model from environment."""
-    return get_model_for_role("ROUTER")
+def get_validation_model() -> str:
+    """Get the configured validation model from environment."""
+    return get_model_for_role("VALIDATION")
 
 
 def get_cypher_agent_model() -> str:
