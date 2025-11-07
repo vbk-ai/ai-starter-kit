@@ -2,6 +2,7 @@
 LangGraph agent for querying Synthea Neo4j database with natural language.
 """
 import json
+import time
 from datetime import datetime
 from typing import Annotated, TypedDict, Sequence
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, ToolMessage
@@ -44,6 +45,9 @@ def get_patient_procedures(patient_name: str, limit: int = 30, tool_call_id: Ann
     """
     log("TOOL", f"Called with patient_name='{patient_name}', limit={limit}", "get_patient_procedures")
 
+    # Track tool execution latency
+    start_time = time.time()
+
     try:
         results, query, params = neo4j_conn.get_patient_procedures(patient_name, limit=limit)
 
@@ -64,6 +68,9 @@ def get_patient_procedures(patient_name: str, limit: int = 30, tool_call_id: Ann
 
             log("TOOL", f"Found {len(results)} procedures", "get_patient_procedures")
 
+        # Calculate latency
+        duration_ms = round((time.time() - start_time) * 1000)
+
         # Create query tracking entry
         query_entry = {
             "query": query,
@@ -73,19 +80,32 @@ def get_patient_procedures(patient_name: str, limit: int = 30, tool_call_id: Ann
             "timestamp": datetime.now().isoformat()
         }
 
+        # Create latency log entry
+        latency_entry = {
+            "name": "Tool: get_patient_procedures",
+            "duration_ms": duration_ms
+        }
+
         # Return Command that updates both messages (for LLM) and executed_queries (for tracking)
         return Command(
             update={
                 "messages": [ToolMessage(content=output, tool_call_id=tool_call_id)],
-                "executed_queries": [query_entry]
+                "executed_queries": [query_entry],
+                "latency_logs": [latency_entry]
             }
         )
     except Exception as e:
         log("TOOL", f"Error - {str(e)}", "get_patient_procedures", level="error")
         error_msg = f"Error retrieving procedures: {str(e)}"
+        duration_ms = round((time.time() - start_time) * 1000)
+
         return Command(
             update={
-                "messages": [ToolMessage(content=error_msg, tool_call_id=tool_call_id)]
+                "messages": [ToolMessage(content=error_msg, tool_call_id=tool_call_id)],
+                "latency_logs": [{
+                    "name": "Tool: get_patient_procedures",
+                    "duration_ms": duration_ms
+                }]
             }
         )
 
@@ -108,6 +128,9 @@ def get_patient_conditions(patient_name: str, limit: int = 30, tool_call_id: Ann
     Returns:
         Command object that updates both LLM-visible messages and internal query tracking state.
     """
+    # Track tool execution latency
+    start_time = time.time()
+
     try:
         results, query, params = neo4j_conn.get_patient_conditions(patient_name, limit=limit)
 
@@ -124,6 +147,9 @@ def get_patient_conditions(patient_name: str, limit: int = 30, tool_call_id: Ann
                 output += f"{i}. {record['condition_description']}\n"
                 output += f"   Diagnosed: {record['encounter_date']}\n\n"
 
+        # Calculate latency
+        duration_ms = round((time.time() - start_time) * 1000)
+
         # Create query tracking entry
         query_entry = {
             "query": query,
@@ -133,17 +159,30 @@ def get_patient_conditions(patient_name: str, limit: int = 30, tool_call_id: Ann
             "timestamp": datetime.now().isoformat()
         }
 
+        # Create latency log entry
+        latency_entry = {
+            "name": "Tool: get_patient_conditions",
+            "duration_ms": duration_ms
+        }
+
         return Command(
             update={
                 "messages": [ToolMessage(content=output, tool_call_id=tool_call_id or "")],
-                "executed_queries": [query_entry]
+                "executed_queries": [query_entry],
+                "latency_logs": [latency_entry]
             }
         )
     except Exception as e:
         error_msg = f"Error retrieving conditions: {str(e)}"
+        duration_ms = round((time.time() - start_time) * 1000)
+
         return Command(
             update={
-                "messages": [ToolMessage(content=error_msg, tool_call_id=tool_call_id or "")]
+                "messages": [ToolMessage(content=error_msg, tool_call_id=tool_call_id or "")],
+                "latency_logs": [{
+                    "name": "Tool: get_patient_conditions",
+                    "duration_ms": duration_ms
+                }]
             }
         )
 
@@ -166,6 +205,9 @@ def get_patient_medications(patient_name: str, limit: int = 30, tool_call_id: An
     Returns:
         Command object that updates both LLM-visible messages and internal query tracking state.
     """
+    # Track tool execution latency
+    start_time = time.time()
+
     try:
         results, query, params = neo4j_conn.get_patient_medications(patient_name, limit=limit)
 
@@ -186,6 +228,9 @@ def get_patient_medications(patient_name: str, limit: int = 30, tool_call_id: An
 
             log("TOOL", f"Tool output starts with: {output[:100]}", "get_patient_medications")
 
+        # Calculate latency
+        duration_ms = round((time.time() - start_time) * 1000)
+
         # Create query tracking entry
         query_entry = {
             "query": query,
@@ -195,17 +240,30 @@ def get_patient_medications(patient_name: str, limit: int = 30, tool_call_id: An
             "timestamp": datetime.now().isoformat()
         }
 
+        # Create latency log entry
+        latency_entry = {
+            "name": "Tool: get_patient_medications",
+            "duration_ms": duration_ms
+        }
+
         return Command(
             update={
                 "messages": [ToolMessage(content=output, tool_call_id=tool_call_id or "")],
-                "executed_queries": [query_entry]
+                "executed_queries": [query_entry],
+                "latency_logs": [latency_entry]
             }
         )
     except Exception as e:
         error_msg = f"Error retrieving medications: {str(e)}"
+        duration_ms = round((time.time() - start_time) * 1000)
+
         return Command(
             update={
-                "messages": [ToolMessage(content=error_msg, tool_call_id=tool_call_id or "")]
+                "messages": [ToolMessage(content=error_msg, tool_call_id=tool_call_id or "")],
+                "latency_logs": [{
+                    "name": "Tool: get_patient_medications",
+                    "duration_ms": duration_ms
+                }]
             }
         )
 
@@ -228,6 +286,9 @@ def get_patient_encounters(patient_name: str, limit: int = 30, tool_call_id: Ann
     Returns:
         Command object that updates both LLM-visible messages and internal query tracking state.
     """
+    # Track tool execution latency
+    start_time = time.time()
+
     try:
         results, query, params = neo4j_conn.get_patient_encounters(patient_name, limit=limit)
 
@@ -245,6 +306,9 @@ def get_patient_encounters(patient_name: str, limit: int = 30, tool_call_id: Ann
                 output += f"   Date: {record['encounter_date']}\n"
                 output += f"   Type: {', '.join(record['encounter_labels'])}\n\n"
 
+        # Calculate latency
+        duration_ms = round((time.time() - start_time) * 1000)
+
         # Create query tracking entry
         query_entry = {
             "query": query,
@@ -254,17 +318,30 @@ def get_patient_encounters(patient_name: str, limit: int = 30, tool_call_id: Ann
             "timestamp": datetime.now().isoformat()
         }
 
+        # Create latency log entry
+        latency_entry = {
+            "name": "Tool: get_patient_encounters",
+            "duration_ms": duration_ms
+        }
+
         return Command(
             update={
                 "messages": [ToolMessage(content=output, tool_call_id=tool_call_id or "")],
-                "executed_queries": [query_entry]
+                "executed_queries": [query_entry],
+                "latency_logs": [latency_entry]
             }
         )
     except Exception as e:
         error_msg = f"Error retrieving encounters: {str(e)}"
+        duration_ms = round((time.time() - start_time) * 1000)
+
         return Command(
             update={
-                "messages": [ToolMessage(content=error_msg, tool_call_id=tool_call_id or "")]
+                "messages": [ToolMessage(content=error_msg, tool_call_id=tool_call_id or "")],
+                "latency_logs": [{
+                    "name": "Tool: get_patient_encounters",
+                    "duration_ms": duration_ms
+                }]
             }
         )
 
@@ -286,6 +363,9 @@ def search_patients(search_term: str = None, limit: int = 30, tool_call_id: Anno
     Returns:
         Command object that updates both LLM-visible messages and internal query tracking state.
     """
+    # Track tool execution latency
+    start_time = time.time()
+
     try:
         results, query, params = neo4j_conn.search_patients(search_term, limit=limit)
 
@@ -301,6 +381,9 @@ def search_patients(search_term: str = None, limit: int = 30, tool_call_id: Anno
                 output += f"{i}. {record['patient_name']} (ID: {record['patient_id']})\n"
                 output += f"   Birth Date: {record['birth_date']}\n\n"
 
+        # Calculate latency
+        duration_ms = round((time.time() - start_time) * 1000)
+
         # Create query tracking entry
         query_entry = {
             "query": query,
@@ -310,32 +393,67 @@ def search_patients(search_term: str = None, limit: int = 30, tool_call_id: Anno
             "timestamp": datetime.now().isoformat()
         }
 
+        # Create latency log entry
+        latency_entry = {
+            "name": "Tool: search_patients",
+            "duration_ms": duration_ms
+        }
+
         return Command(
             update={
                 "messages": [ToolMessage(content=output, tool_call_id=tool_call_id or "")],
-                "executed_queries": [query_entry]
+                "executed_queries": [query_entry],
+                "latency_logs": [latency_entry]
             }
         )
     except Exception as e:
         error_msg = f"Error searching patients: {str(e)}"
+        duration_ms = round((time.time() - start_time) * 1000)
+
         return Command(
             update={
-                "messages": [ToolMessage(content=error_msg, tool_call_id=tool_call_id or "")]
+                "messages": [ToolMessage(content=error_msg, tool_call_id=tool_call_id or "")],
+                "latency_logs": [{
+                    "name": "Tool: search_patients",
+                    "duration_ms": duration_ms
+                }]
             }
         )
 
 
 @tool
 @traceable(name="get_database_schema", run_type="tool", tags=["tool", "schema", "database"])
-def get_database_schema() -> str:
+def get_database_schema(tool_call_id: Annotated[str, InjectedToolCallId] = None) -> Command:
     """
     Get information about the database schema and structure.
     Use this to understand how data is organized and what relationships exist.
 
+    Args:
+        tool_call_id: Internal parameter for tracking (automatically provided by LangGraph)
+
     Returns:
-        A description of the database schema including entities and relationships.
+        Command object that updates both LLM-visible messages and latency tracking state.
     """
-    return neo4j_conn.get_database_schema()
+    # Track tool execution latency
+    start_time = time.time()
+
+    schema_description = neo4j_conn.get_database_schema()
+
+    # Calculate latency
+    duration_ms = round((time.time() - start_time) * 1000)
+
+    # Create latency log entry
+    latency_entry = {
+        "name": "Tool: get_database_schema",
+        "duration_ms": duration_ms
+    }
+
+    return Command(
+        update={
+            "messages": [ToolMessage(content=schema_description, tool_call_id=tool_call_id or "")],
+            "latency_logs": [latency_entry]
+        }
+    )
 
 
 @tool
@@ -380,12 +498,18 @@ def execute_custom_query(user_question: str, tool_call_id: Annotated[str, Inject
             "user_question": user_question,
             "generated_cypher": "",
             "cypher_explanation": "",
-            "query_results": ""
+            "query_results": "",
+            "llm_latency_ms": 0,
+            "tool_latency_ms": 0
         })
 
         # Extract the response and generated cypher
         response = subgraph_result["messages"][-1].content if subgraph_result["messages"] else "No response"
         generated_cypher = subgraph_result.get("generated_cypher", "")
+
+        # Extract latency information from subgraph
+        llm_latency = subgraph_result.get("llm_latency_ms", 0)
+        tool_latency = subgraph_result.get("tool_latency_ms", 0)
 
         # Create query tracking entry with all details
         query_entry = {
@@ -397,10 +521,24 @@ def execute_custom_query(user_question: str, tool_call_id: Annotated[str, Inject
             "timestamp": datetime.now().isoformat()
         }
 
+        # Create latency log entries for Cypher subgraph
+        latency_logs = []
+        if llm_latency > 0:
+            latency_logs.append({
+                "name": "LLM: Cypher",
+                "duration_ms": llm_latency
+            })
+        if tool_latency > 0:
+            latency_logs.append({
+                "name": "Tool: execute_cypher_query",
+                "duration_ms": tool_latency
+            })
+
         return Command(
             update={
                 "messages": [ToolMessage(content=response, tool_call_id=tool_call_id or "")],
-                "executed_queries": [query_entry] if generated_cypher else []  # Only track if query was generated
+                "executed_queries": [query_entry] if generated_cypher else [],  # Only track if query was generated
+                "latency_logs": latency_logs
             }
         )
 
@@ -423,11 +561,21 @@ def add_queries(existing: list, new: list) -> list:
     return existing + new
 
 
+# Reducer function for latency_logs - concatenates new latency entries to existing list
+def add_latency_logs(existing: list, new: list) -> list:
+    """
+    Reducer that concatenates new latency logs to the existing list.
+    This tracks both LLM calls and tool executions with their timing information.
+    """
+    return existing + new
+
+
 # Define the agent state
 class AgentState(TypedDict):
     """State of the agent conversation."""
     messages: Annotated[Sequence[BaseMessage], add_messages]
     executed_queries: Annotated[list, add_queries]  # Track all Cypher queries executed (with reducer)
+    latency_logs: Annotated[list, add_latency_logs]  # Track LLM and tool call latencies (with reducer)
     iteration_count: int  # Track number of reflection loop iterations
     route_decision: str  # Router's decision: "cypher" or "agent"
 
@@ -435,6 +583,9 @@ class AgentState(TypedDict):
     # structured query data that the caller can access, separate from LLM messages.
     # The reducer ensures that when tools return new queries via Command, they are
     # appended to the list rather than replacing it.
+    #
+    # Note: latency_logs tracks timing information for LLM calls and tool executions.
+    # Format: [{"name": "LLM: Validation", "duration_ms": 123.45}, ...]
 
 
 # Create the tools list (INCLUDING execute_custom_query for analytics)
@@ -560,20 +711,34 @@ IRRELEVANT queries include:
 Classify this query as relevant (True) or irrelevant (False)."""
 
         try:
+            # Track validation LLM latency
+            start_time = time.time()
             decision: ValidationDecision = validation_llm.invoke(validation_prompt)
+            duration_ms = round((time.time() - start_time) * 1000)
+
             log("APP", f"Validation decision: {decision.is_relevant} - {decision.reasoning}")
+
+            # Create latency log entry
+            latency_entry = {
+                "name": "LLM: Validation",
+                "duration_ms": duration_ms
+            }
 
             if not decision.is_relevant:
                 # Query is not relevant - return rejection message
                 rejection_message = "I am sorry - I can only answer questions that pertain to the Synthea medical records."
                 log("APP", f"Query rejected as irrelevant: {user_query[:80]}...")
                 return {
-                    "messages": messages + [AIMessage(content=rejection_message)]
+                    "messages": messages + [AIMessage(content=rejection_message)],
+                    "latency_logs": [latency_entry]
                 }
 
             # Query is relevant - proceed with normal flow
             log("APP", "Query validated as relevant, proceeding to agent")
-            return {"messages": messages}
+            return {
+                "messages": messages,
+                "latency_logs": [latency_entry]
+            }
 
         except Exception as e:
             log("APP", f"Validation error: {e}, proceeding to agent", level="error")
@@ -652,15 +817,9 @@ TOOL SELECTION GUIDELINES:
 - Statistical queries ("Distribution of...", "Trends over time...")
 
 **RESULT LIMITS:**
-All tools return a maximum of 30 results by default, sorted by most recent first (for timestamped data).
-- The default limit of 30 is sufficient for most queries and provides good performance
+- All tools return a maximum of 30 results by default, sorted by most recent first
 - Only increase the limit parameter if the user explicitly requests more results (e.g., "show me all 100 procedures" or "give me the last 50 medications")
-- For patient search, results are sorted by name similarity to the search term
-- For patient data (procedures, medications, conditions, encounters), results are sorted by most recent date first
-
-**TOOL RESULT HANDLING:**
-- The query results may be limited by a LIMIT clause and that is indicated in the response text (commonly LIMIT 30)
-- If the query results are already limited, do not limit them further and show them as-is
+- Tool outputs will indicate if results were limited
 
 **MULTI-STEP QUERIES:**
 If a query requires multiple pieces of information, call ALL relevant tools in a single response.
@@ -668,14 +827,12 @@ If a query requires multiple pieces of information, call ALL relevant tools in a
 Example: "What procedures and medications did John Smith have?"
 → Call BOTH get_patient_procedures AND get_patient_medications in the same response
 
-**RESPONDING TO USERS:**
-When you receive results from tool calls, synthesize the information into a clear, natural answer.
-- Extract specific details (names, dates, numbers, amounts) from tool results
-- Present information in a conversational way
-- For multiple tool results, organize information logically
-- Be concise but complete - answer the user's question directly
-- If data was successfully retrieved, present findings with all specific values
-- If there were errors, explain what went wrong in user-friendly terms
+**PATIENT NAMES:**
+Patient names in this database are synthetic and may include numbers (e.g., "Ethan766 Nolan344" or "John123 Smith456").
+- These alphanumeric names are actual patient names, NOT patient IDs
+- When a user asks about a patient with an alphanumeric name, use that exact name in your tool calls
+- Don't ask for clarification or treat these as IDs - they are the actual names in the database
+- Tools can match patients using just the first name, just the last name, or the full name - simply pass whatever name the user provides to the tool and let it handle the matching
 
 Always be clear and helpful in your responses. If a patient is not found, suggest searching by name."""
 
@@ -697,6 +854,32 @@ DO NOT ADD PHRASES LIKE "showing up to 30" OR "top 30" UNLESS THE TOOL OUTPUT CO
 - If it does NOT have that phrase → do NOT add any "showing up to" or "top X" language
 - Instead, just state the actual count (e.g., "has 21 medications")
 
+*** CRITICAL RULE #2 - PATIENT IDs ***
+DO NOT include patient IDs (UUIDs like "34363d95-4e03-4910-5018-3cabddcc50a3") in your response UNLESS the user specifically asked for IDs.
+- Only show patient names and other relevant clinical information
+- IDs are internal database identifiers that are not useful to users in most cases
+- Exception: If the user explicitly asks "show me the patient ID" or similar, then include it
+
+*** CRITICAL RULE #3 - MARKDOWN FORMATTING ***
+Your response will be rendered as Markdown in the UI.
+
+IMPORTANT LIST FORMATTING - Use this EXACT format (no trailing spaces, no blank lines):
+```
+Here are the results:
+
+1. Item one text here
+2. Item two text here
+3. Item three text here
+```
+
+DO NOT use trailing spaces (two spaces at line end) for line breaks - they cause excessive spacing in lists.
+If you need an explicit line break within text, use a blank line to start a new paragraph instead.
+
+Rules:
+- NEVER add trailing spaces after list items
+- No blank lines between list items
+- Lists should be compact and readable
+
 IMPORTANT - SYNTHESIZE YOUR FINAL ANSWER NOW:
 
 1. Review all tool results and extract specific data (names, dates, numbers, amounts)
@@ -706,20 +889,24 @@ IMPORTANT - SYNTHESIZE YOUR FINAL ANSWER NOW:
 
 FORMATTING GUIDELINES:
 
-**For Questions Requesting Multiple Records (procedures, medications, conditions, encounters, etc.):**
-- ALWAYS present the results as a numbered list
+**For Single-Result Queries (only ONE item to report):**
+- DO NOT use numbered lists or bullet points for single results
+- Present the answer as a natural, conversational sentence
+- Examples:
+  * "Sarah Williams has spent the most on healthcare, with total expenses of $3,245,123.50."
+  * "Robert Johnson's most recent procedure was a Blood Pressure Screening on 2024-02-20."
+  * "The database contains 6,421 total patient records."
+
+**For Multiple Records (2+ items - procedures, medications, conditions, encounters, etc.):**
+- Present the results as a numbered list
 - Include a brief introductory sentence with the patient name and count
 - Check the tool output's first line for limit language:
   * Contains "(showing up to X most recent)" → Say "has had at least X [items]. Here are X of the most recent [items]:"
   * Does NOT contain limit language → Say "has X [items]:" where X is the actual count
 - Then list ALL items from the tool results
 - Examples:
-  * Tool says "(showing up to 30 most recent)" → "Ethan766 Nolan344 has had at least 30 procedures. Here are 30 of the most recent procedures:"
-  * Tool has no limit phrase → "Ethan766 Nolan344 has 21 medications:"
-
-**For Single Item or Summary Queries:**
-- Present findings naturally in clear sentences
-- Example: "John Smith's most recent procedure was an Electrocardiogram on 2023-06-15."
+  * Tool says "(showing up to 30 most recent)" → "Michael Brown has had at least 30 procedures. Here are 30 of the most recent procedures:"
+  * Tool has no limit phrase → "Jennifer Davis has 18 medications:"
 
 **For Multiple Tool Results (combining different types of data):**
 - Organize information logically (chronologically, by category, or by relationship)
@@ -740,16 +927,27 @@ Provide your synthesized answer now:"""
 
             messages = messages + [HumanMessage(content=synthesis_instruction)]
 
+        # Track main agent LLM latency
+        start_time = time.time()
         response = llm_with_tools.invoke(messages)
+        duration_ms = round((time.time() - start_time) * 1000)
 
         if hasattr(response, 'content') and response.content:
             log("AGENT", f"Response content: {response.content[:200]}...", "MAIN")
         if hasattr(response, 'tool_calls') and response.tool_calls:
             log("AGENT", f"Made tool calls: {[tc['name'] for tc in response.tool_calls]}", "MAIN")
 
+        # Determine if this is synthesis mode or initial call
+        llm_name = "LLM: Synthesis" if has_tool_results else "LLM: Main"
+        latency_entry = {
+            "name": llm_name,
+            "duration_ms": duration_ms
+        }
+
         return {
             "messages": [response],
-            "iteration_count": new_iteration
+            "iteration_count": new_iteration,
+            "latency_logs": [latency_entry]
         }
 
     # NOTE: call_model_summary() removed - agent now synthesizes its own responses
@@ -810,7 +1008,7 @@ Provide your synthesized answer now:"""
 
 
 @traceable(name="query_agent", tags=["agent", "main"])
-def query_agent(agent, user_message: str, conversation_history: list = None, executed_queries: list = None) -> tuple[str, list, list]:
+def query_agent(agent, user_message: str, conversation_history: list = None, executed_queries: list = None) -> tuple[str, list, list, list]:
     """
     Query the agent with a user message.
 
@@ -821,7 +1019,7 @@ def query_agent(agent, user_message: str, conversation_history: list = None, exe
         executed_queries: Previous executed queries (not used, reset each turn)
 
     Returns:
-        Tuple of (response_text, updated_conversation_history, executed_queries)
+        Tuple of (response_text, updated_conversation_history, executed_queries, latency_logs)
     """
     if conversation_history is None:
         conversation_history = []
@@ -829,11 +1027,12 @@ def query_agent(agent, user_message: str, conversation_history: list = None, exe
     # Add user message to history
     conversation_history.append(HumanMessage(content=user_message))
 
-    # Run the agent with state - reset executed_queries to empty list for each new turn
-    # This ensures only queries from the current turn are returned
+    # Run the agent with state - reset executed_queries and latency_logs to empty list for each new turn
+    # This ensures only queries and latency logs from the current turn are returned
     result = agent.invoke({
         "messages": conversation_history,
         "executed_queries": [],  # Reset to empty list for each new query
+        "latency_logs": [],  # Reset to empty list for each new query
         "iteration_count": 0  # Initialize iteration count for each new query
     })
 
@@ -841,8 +1040,9 @@ def query_agent(agent, user_message: str, conversation_history: list = None, exe
     final_message = result["messages"][-1]
     response_text = final_message.content
 
-    # Update conversation history and get only the queries from this turn
+    # Update conversation history and get only the queries and latency logs from this turn
     conversation_history = result["messages"]
     executed_queries = result.get("executed_queries", [])
+    latency_logs = result.get("latency_logs", [])
 
-    return response_text, conversation_history, executed_queries
+    return response_text, conversation_history, executed_queries, latency_logs

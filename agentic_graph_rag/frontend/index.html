@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Synthea Medical Database Chatbot</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked@11.1.1/marked.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -126,6 +127,116 @@
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
         }
 
+        /* Markdown rendering styles for assistant messages */
+        .message.assistant .message-content p {
+            margin: 0.5em 0;
+        }
+
+        .message.assistant .message-content p:first-child {
+            margin-top: 0;
+        }
+
+        .message.assistant .message-content p:last-child {
+            margin-bottom: 0;
+        }
+
+        .message.assistant .message-content h1,
+        .message.assistant .message-content h2,
+        .message.assistant .message-content h3,
+        .message.assistant .message-content h4 {
+            margin: 1em 0 0.5em 0;
+            font-weight: 600;
+        }
+
+        .message.assistant .message-content h1:first-child,
+        .message.assistant .message-content h2:first-child,
+        .message.assistant .message-content h3:first-child,
+        .message.assistant .message-content h4:first-child {
+            margin-top: 0;
+        }
+
+        .message.assistant .message-content ul,
+        .message.assistant .message-content ol {
+            margin: 0.5em 0;
+            padding-left: 1.5em;
+        }
+
+        .message.assistant .message-content li {
+            margin: 0.25em 0;
+        }
+
+        .message.assistant .message-content strong {
+            font-weight: 600;
+        }
+
+        .message.assistant .message-content em {
+            font-style: italic;
+        }
+
+        .message.assistant .message-content code {
+            background: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+
+        .message.assistant .message-content pre {
+            background: #2d2d2d;
+            color: #f8f8f2;
+            padding: 12px;
+            border-radius: 6px;
+            overflow-x: auto;
+            margin: 0.5em 0;
+        }
+
+        .message.assistant .message-content pre code {
+            background: none;
+            padding: 0;
+            color: inherit;
+            font-size: 0.9em;
+        }
+
+        .message.assistant .message-content blockquote {
+            border-left: 3px solid #667eea;
+            padding-left: 1em;
+            margin: 0.5em 0;
+            color: #666;
+        }
+
+        .message.assistant .message-content a {
+            color: #667eea;
+            text-decoration: none;
+        }
+
+        .message.assistant .message-content a:hover {
+            text-decoration: underline;
+        }
+
+        .message.assistant .message-content table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 0.5em 0;
+        }
+
+        .message.assistant .message-content th,
+        .message.assistant .message-content td {
+            border: 1px solid #e0e0e0;
+            padding: 8px;
+            text-align: left;
+        }
+
+        .message.assistant .message-content th {
+            background: #f8f9fa;
+            font-weight: 600;
+        }
+
+        .message.assistant .message-content hr {
+            border: none;
+            border-top: 1px solid #e0e0e0;
+            margin: 1em 0;
+        }
+
         .message.system .message-content {
             max-width: 100%;
             background: #e3f2fd;
@@ -198,6 +309,34 @@
 
         @keyframes spin {
             to { transform: rotate(360deg); }
+        }
+
+        /* Loading spinner message */
+        .loading-message {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 15px 20px;
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 18px;
+            border-bottom-left-radius: 4px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+            max-width: 70%;
+        }
+
+        .spinner {
+            width: 24px;
+            height: 24px;
+            border: 3px solid #f0f0f0;
+            border-top-color: #667eea;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        .loading-text {
+            color: #666;
+            font-size: 14px;
         }
 
         .controls {
@@ -274,6 +413,91 @@
         }
 
         /* Query tracking collapsible widget */
+        /* Latency Chart Styles */
+        .latency-chart {
+            margin-top: 15px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 15px;
+            background: #f8f9fa;
+        }
+
+        .latency-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 12px;
+        }
+
+        .latency-bars {
+            margin-bottom: 12px;
+        }
+
+        .latency-bar-container {
+            margin-bottom: 10px;
+        }
+
+        .latency-label {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 4px;
+        }
+
+        .latency-bar {
+            height: 24px;
+            border-radius: 4px;
+            transition: all 0.3s ease;
+            min-width: 2%;
+        }
+
+        .latency-bar.llm {
+            background-color: #4CAF50;
+        }
+
+        .latency-bar.tool {
+            background-color: #2196F3;
+        }
+
+        .latency-bar.network {
+            background-color: #FF9800;
+        }
+
+        .latency-details-toggle {
+            font-size: 12px;
+            color: #667eea;
+            cursor: pointer;
+            user-select: none;
+            padding: 6px;
+            border-radius: 4px;
+            transition: background 0.2s;
+        }
+
+        .latency-details-toggle:hover {
+            background: #e8eaf6;
+        }
+
+        .latency-details-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+        }
+
+        .latency-details-content.expanded {
+            max-height: 400px;
+            overflow-y: auto;
+            margin-top: 8px;
+        }
+
+        .latency-log-item {
+            font-size: 11px;
+            font-family: 'Courier New', monospace;
+            padding: 6px 10px;
+            background: white;
+            border-left: 3px solid #667eea;
+            margin: 4px 0;
+            border-radius: 3px;
+        }
+
         .query-tracker {
             margin-top: 10px;
             border-top: 1px solid #e0e0e0;
@@ -451,16 +675,28 @@
         }
 
         // Add message to chat
-        function addMessage(role, content, queries = null) {
+        function addMessage(role, content, queries = null, latencyLogs = null, totalLatencyMs = null) {
             const chatContainer = document.getElementById('chatContainer');
             const messageDiv = document.createElement('div');
             messageDiv.className = `message ${role}`;
 
             const contentDiv = document.createElement('div');
             contentDiv.className = 'message-content';
-            contentDiv.textContent = content;
+
+            // Render markdown for assistant messages, plain text for others
+            if (role === 'assistant') {
+                contentDiv.innerHTML = marked.parse(content);
+            } else {
+                contentDiv.textContent = content;
+            }
 
             messageDiv.appendChild(contentDiv);
+
+            // Add latency breakdown chart if data is available (only for assistant messages)
+            if (role === 'assistant' && latencyLogs && latencyLogs.length > 0 && totalLatencyMs) {
+                const latencyChart = createLatencyChart(latencyLogs, totalLatencyMs);
+                contentDiv.appendChild(latencyChart);
+            }
 
             // Add query tracker if there are queries (only for assistant messages)
             if (role === 'assistant' && queries && queries.length > 0) {
@@ -472,6 +708,91 @@
 
             // Scroll to bottom
             chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        // Create latency breakdown chart
+        function createLatencyChart(latencyLogs, totalLatencyMs) {
+            const chartContainer = document.createElement('div');
+            chartContainer.className = 'latency-chart';
+
+            // Calculate breakdown
+            const llmTotal = latencyLogs
+                .filter(log => log.name.startsWith('LLM:'))
+                .reduce((sum, log) => sum + log.duration_ms, 0);
+
+            const toolTotal = latencyLogs
+                .filter(log => log.name.startsWith('Tool:'))
+                .reduce((sum, log) => sum + log.duration_ms, 0);
+
+            const networkLatency = Math.max(0, totalLatencyMs - llmTotal - toolTotal);
+
+            // Create chart title
+            const title = document.createElement('div');
+            title.className = 'latency-title';
+            title.textContent = `⏱️ Latency Breakdown (${totalLatencyMs}ms total)`;
+
+            // Create chart bars
+            const chartBars = document.createElement('div');
+            chartBars.className = 'latency-bars';
+
+            const categories = [
+                { label: 'LLM Calls', value: llmTotal, color: '#4CAF50', class: 'llm' },
+                { label: 'Tool Calls', value: toolTotal, color: '#2196F3', class: 'tool' },
+                { label: 'Networking', value: networkLatency, color: '#FF9800', class: 'network' }
+            ];
+
+            categories.forEach(cat => {
+                if (cat.value > 0) {
+                    const percentage = ((cat.value / totalLatencyMs) * 100).toFixed(1);
+                    const barContainer = document.createElement('div');
+                    barContainer.className = 'latency-bar-container';
+
+                    const label = document.createElement('div');
+                    label.className = 'latency-label';
+                    label.textContent = `${cat.label}: ${cat.value}ms (${percentage}%)`;
+
+                    const bar = document.createElement('div');
+                    bar.className = `latency-bar ${cat.class}`;
+                    bar.style.width = `${percentage}%`;
+                    bar.style.backgroundColor = cat.color;
+
+                    barContainer.appendChild(label);
+                    barContainer.appendChild(bar);
+                    chartBars.appendChild(barContainer);
+                }
+            });
+
+            // Create detailed breakdown (expandable)
+            const detailsToggle = document.createElement('div');
+            detailsToggle.className = 'latency-details-toggle';
+            detailsToggle.textContent = '▶ View detailed breakdown';
+
+            const detailsContent = document.createElement('div');
+            detailsContent.className = 'latency-details-content';
+
+            latencyLogs.forEach(log => {
+                const logItem = document.createElement('div');
+                logItem.className = 'latency-log-item';
+                logItem.textContent = `${log.name}: ${log.duration_ms}ms`;
+                detailsContent.appendChild(logItem);
+            });
+
+            detailsToggle.addEventListener('click', () => {
+                detailsToggle.classList.toggle('expanded');
+                detailsContent.classList.toggle('expanded');
+                if (detailsToggle.classList.contains('expanded')) {
+                    detailsToggle.textContent = '▼ View detailed breakdown';
+                } else {
+                    detailsToggle.textContent = '▶ View detailed breakdown';
+                }
+            });
+
+            chartContainer.appendChild(title);
+            chartContainer.appendChild(chartBars);
+            chartContainer.appendChild(detailsToggle);
+            chartContainer.appendChild(detailsContent);
+
+            return chartContainer;
         }
 
         // Create query tracker widget
@@ -548,6 +869,33 @@
             document.getElementById('status').textContent = status;
         }
 
+        // Show loading spinner
+        function showLoadingSpinner() {
+            const chatContainer = document.getElementById('chatContainer');
+            const loadingDiv = document.createElement('div');
+            loadingDiv.className = 'message assistant';
+            loadingDiv.id = 'loading-spinner';
+
+            const loadingContent = document.createElement('div');
+            loadingContent.className = 'loading-message';
+            loadingContent.innerHTML = `
+                <div class="spinner"></div>
+                <div class="loading-text">Thinking...</div>
+            `;
+
+            loadingDiv.appendChild(loadingContent);
+            chatContainer.appendChild(loadingDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        // Remove loading spinner
+        function removeLoadingSpinner() {
+            const spinner = document.getElementById('loading-spinner');
+            if (spinner) {
+                spinner.remove();
+            }
+        }
+
         // Send message to API
         async function sendMessage() {
             const input = document.getElementById('userInput');
@@ -567,7 +915,13 @@
             addMessage('user', message);
             input.value = '';
 
+            // Show loading spinner
+            showLoadingSpinner();
+
             try {
+                // Track request start time
+                const requestStartTime = Date.now();
+
                 // Send request to API
                 const response = await fetch(`${API_BASE_URL}/chat`, {
                     method: 'POST',
@@ -586,12 +940,20 @@
 
                 const data = await response.json();
 
-                // Add assistant response to chat with queries
-                addMessage('assistant', data.response, data.executed_queries);
+                // Calculate total latency
+                const requestEndTime = Date.now();
+                const totalLatencyMs = requestEndTime - requestStartTime;
+
+                // Remove loading spinner
+                removeLoadingSpinner();
+
+                // Add assistant response to chat with queries and latency data
+                addMessage('assistant', data.response, data.executed_queries, data.latency_logs, totalLatencyMs);
                 updateStatus('Ready');
 
             } catch (error) {
                 console.error('Error:', error);
+                removeLoadingSpinner();
                 addMessage('system', `Error: ${error.message}. Please make sure the backend server is running.`);
                 updateStatus('Error');
             } finally {
@@ -650,7 +1012,7 @@
 
                 // Show a system message about the switch
                 const providerName = provider === 'anthropic' ? 'Anthropic' : 'SambaNova';
-                addMessage('system', `Switched to ${providerName} provider. Models: ${data.models.main_agent} (Main), ${data.models.router} (Router), ${data.models.cypher_agent} (Cypher)`);
+                addMessage('system', `Switched to ${providerName} provider. Models: ${data.models.main_agent} (Main), ${data.models.validation} (Validation), ${data.models.cypher_agent} (Cypher)`);
             } catch (error) {
                 console.error('Error switching provider:', error);
                 updateStatus('Error switching provider');

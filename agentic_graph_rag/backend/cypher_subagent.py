@@ -3,6 +3,7 @@ Cypher Subagent - LangGraph subgraph for constructing custom Cypher queries.
 This subagent has deep knowledge of the Synthea database schema.
 """
 import os
+import time
 import logging
 from typing import TypedDict, Annotated, Sequence
 from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage, AIMessage
@@ -234,6 +235,8 @@ class CypherSubgraphState(TypedDict):
     generated_cypher: str
     cypher_explanation: str
     query_results: str
+    llm_latency_ms: int  # Track Cypher LLM latency
+    tool_latency_ms: int  # Track execute_cypher_query tool latency
 
 
 # Tool for executing Cypher queries (used by subgraph)
@@ -450,8 +453,10 @@ Now help the user with their question!"""
         if len(messages) > 0:
             full_messages.extend(messages)
 
-        # Call LLM
+        # Call LLM and track latency
+        start_time = time.time()
         response = llm_with_tools.invoke(full_messages)
+        llm_duration_ms = round((time.time() - start_time) * 1000)
 
         # Extract the Cypher query from tool calls if present
         generated_query = state.get("generated_cypher", "")
@@ -467,18 +472,30 @@ Now help the user with their question!"""
 
         return {
             "messages": [response],
-            "generated_cypher": generated_query
+            "generated_cypher": generated_query,
+            "llm_latency_ms": llm_duration_ms
         }
 
     # Create ToolNode
     tool_node = ToolNode(tools)
+
+    # Wrap tool_node to track latency
+    def tool_node_with_latency(state: CypherSubgraphState) -> dict:
+        """Wrapper for tool node that tracks execution latency."""
+        start_time = time.time()
+        result = tool_node.invoke(state)
+        tool_duration_ms = round((time.time() - start_time) * 1000)
+
+        # Add tool latency to result
+        result["tool_latency_ms"] = tool_duration_ms
+        return result
 
     # Build the subgraph
     workflow = StateGraph(CypherSubgraphState)
 
     # Add nodes
     workflow.add_node("cypher_generator", call_cypher_generator)
-    workflow.add_node("execute_query", tool_node)
+    workflow.add_node("execute_query", tool_node_with_latency)
 
     # Set entry point
     workflow.set_entry_point("cypher_generator")

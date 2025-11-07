@@ -129,7 +129,7 @@ def test_search_patients_tool(agent, conversation_state):
     question = "Search for patients named John"
     print(f"Question: {question}\n")
 
-    response, conversation_state["history"], conversation_state["queries"] = query_agent(
+    response, conversation_state["history"], conversation_state["queries"], _ = query_agent(
         agent, question, conversation_state["history"], conversation_state["queries"]
     )
 
@@ -161,7 +161,7 @@ def test_get_patient_procedures_tool(agent, conversation_state):
     question = "What procedures has patient Ethan766 had?"
     print(f"Question: {question}\n")
 
-    response, conversation_state["history"], conversation_state["queries"] = query_agent(
+    response, conversation_state["history"], conversation_state["queries"], _ = query_agent(
         agent, question, conversation_state["history"], conversation_state["queries"]
     )
 
@@ -192,7 +192,7 @@ def test_get_patient_medications_tool(agent, conversation_state):
     question = "What medications is Ethan766 taking?"
     print(f"Question: {question}\n")
 
-    response, conversation_state["history"], conversation_state["queries"] = query_agent(
+    response, conversation_state["history"], conversation_state["queries"], _ = query_agent(
         agent, question, conversation_state["history"], conversation_state["queries"]
     )
 
@@ -227,7 +227,7 @@ def test_get_patient_conditions_tool(agent, conversation_state):
     question = "What diagnoses does Ethan766 have?"
     print(f"Question: {question}\n")
 
-    response, conversation_state["history"], conversation_state["queries"] = query_agent(
+    response, conversation_state["history"], conversation_state["queries"], _ = query_agent(
         agent, question, conversation_state["history"], conversation_state["queries"]
     )
 
@@ -257,7 +257,7 @@ def test_get_patient_encounters_tool(agent, conversation_state):
     question = "Show me all encounters for Ethan766"
     print(f"Question: {question}\n")
 
-    response, conversation_state["history"], conversation_state["queries"] = query_agent(
+    response, conversation_state["history"], conversation_state["queries"], _ = query_agent(
         agent, question, conversation_state["history"], conversation_state["queries"]
     )
 
@@ -283,7 +283,7 @@ def test_get_database_schema_tool(agent, conversation_state):
     question = "What is the database schema?"
     print(f"Question: {question}\n")
 
-    response, conversation_state["history"], conversation_state["queries"] = query_agent(
+    response, conversation_state["history"], conversation_state["queries"], _ = query_agent(
         agent, question, conversation_state["history"], conversation_state["queries"]
     )
 
@@ -309,7 +309,7 @@ def test_cypher_subgraph_simple_analytics(agent, conversation_state):
     question = "How many patients are in the database?"
     print(f"Question: {question}\n")
 
-    response, conversation_state["history"], conversation_state["queries"] = query_agent(
+    response, conversation_state["history"], conversation_state["queries"], _ = query_agent(
         agent, question, conversation_state["history"], conversation_state["queries"]
     )
 
@@ -342,7 +342,7 @@ def test_cypher_subgraph_complex_analytics(agent, conversation_state):
     question = "Which procedures were performed most frequently? Show top 10."
     print(f"Question: {question}\n")
 
-    response, conversation_state["history"], conversation_state["queries"] = query_agent(
+    response, conversation_state["history"], conversation_state["queries"], _ = query_agent(
         agent, question, conversation_state["history"], conversation_state["queries"]
     )
 
@@ -378,7 +378,7 @@ def test_response_formatting_no_comprehensive_preamble(agent, conversation_state
     question = "Which patient has spent the most on treatments?"
     print(f"Question: {question}\n")
 
-    response, conversation_state["history"], conversation_state["queries"] = query_agent(
+    response, conversation_state["history"], conversation_state["queries"], _ = query_agent(
         agent, question, conversation_state["history"], conversation_state["queries"]
     )
 
@@ -423,7 +423,7 @@ def test_validation_relevant_query(agent, conversation_state):
     question = "What medications is patient Ethan766 taking?"
     print(f"Question: {question}\n")
 
-    response, conversation_state["history"], conversation_state["queries"] = query_agent(
+    response, conversation_state["history"], conversation_state["queries"], _ = query_agent(
         agent, question, conversation_state["history"], conversation_state["queries"]
     )
 
@@ -456,7 +456,7 @@ def test_validation_irrelevant_query_weather(agent, conversation_state):
     question = "What's the weather like today?"
     print(f"Question: {question}\n")
 
-    response, conversation_state["history"], conversation_state["queries"] = query_agent(
+    response, conversation_state["history"], conversation_state["queries"], _ = query_agent(
         agent, question, conversation_state["history"], conversation_state["queries"]
     )
 
@@ -490,7 +490,7 @@ def test_validation_irrelevant_query_general_knowledge(agent, conversation_state
     question = "Who is the president of the United States?"
     print(f"Question: {question}\n")
 
-    response, conversation_state["history"], conversation_state["queries"] = query_agent(
+    response, conversation_state["history"], conversation_state["queries"], _ = query_agent(
         agent, question, conversation_state["history"], conversation_state["queries"]
     )
 
@@ -524,7 +524,7 @@ def test_validation_edge_case_database_schema_query(agent, conversation_state):
     question = "What is the database schema?"
     print(f"Question: {question}\n")
 
-    response, conversation_state["history"], conversation_state["queries"] = query_agent(
+    response, conversation_state["history"], conversation_state["queries"], _ = query_agent(
         agent, question, conversation_state["history"], conversation_state["queries"]
     )
 

@@ -403,24 +403,24 @@
     <script type="text/javascript">
         // Define the graph structure based on the LangGraph implementation
         const nodes = new vis.DataSet([
-            // Main graph nodes
-            { id: 'START', label: 'START', color: '#4CAF50', shape: 'box', font: { color: 'white', size: 16, face: 'monospace' } },
-            { id: 'validation', label: 'VALIDATION\n(check relevance)', color: '#2196F3', shape: 'box', font: { color: 'white', size: 14 } },
-            { id: 'agent', label: 'AGENT\n(LLM + tools)', color: '#FF9800', shape: 'box', font: { color: 'white', size: 14 } },
-            { id: 'END', label: 'END', color: '#4CAF50', shape: 'box', font: { color: 'white', size: 16, face: 'monospace' } },
+            // Main graph nodes with fixed positions (x increases left to right, y increases top to bottom)
+            { id: 'START', label: 'START', color: '#4CAF50', shape: 'box', font: { color: 'white', size: 16, face: 'monospace' }, x: -600, y: 0, fixed: true },
+            { id: 'validation', label: 'VALIDATION\n(check relevance)', color: '#2196F3', shape: 'box', font: { color: 'white', size: 14 }, x: -300, y: 0, fixed: true },
+            { id: 'agent', label: 'AGENT\n(LLM + tools)', color: '#FF9800', shape: 'box', font: { color: 'white', size: 14 }, x: 0, y: 0, fixed: true },
+            { id: 'END', label: 'END', color: '#4CAF50', shape: 'box', font: { color: 'white', size: 16, face: 'monospace' }, x: -150, y: 200, fixed: true },
 
-            // Tool nodes (individual tools)
-            { id: 'get_patient_procedures', label: 'get_patient_\nprocedures', color: '#9C27B0', shape: 'box', font: { color: 'white', size: 12 } },
-            { id: 'get_patient_conditions', label: 'get_patient_\nconditions', color: '#9C27B0', shape: 'box', font: { color: 'white', size: 12 } },
-            { id: 'get_patient_medications', label: 'get_patient_\nmedications', color: '#9C27B0', shape: 'box', font: { color: 'white', size: 12 } },
-            { id: 'get_patient_encounters', label: 'get_patient_\nencounters', color: '#9C27B0', shape: 'box', font: { color: 'white', size: 12 } },
-            { id: 'search_patients', label: 'search_patients', color: '#9C27B0', shape: 'box', font: { color: 'white', size: 12 } },
-            { id: 'get_database_schema', label: 'get_database_\nschema', color: '#9C27B0', shape: 'box', font: { color: 'white', size: 12 } },
-            { id: 'execute_custom_query', label: 'execute_custom_\nquery', color: '#F44336', shape: 'box', font: { color: 'white', size: 12 } },
+            // Tool nodes (individual tools) - vertically aligned on the right, with cypher at the bottom
+            { id: 'get_patient_procedures', label: 'get_patient_\nprocedures', color: '#9C27B0', shape: 'box', font: { color: 'white', size: 12 }, x: 300, y: -250, fixed: true },
+            { id: 'get_patient_conditions', label: 'get_patient_\nconditions', color: '#9C27B0', shape: 'box', font: { color: 'white', size: 12 }, x: 300, y: -150, fixed: true },
+            { id: 'get_patient_medications', label: 'get_patient_\nmedications', color: '#9C27B0', shape: 'box', font: { color: 'white', size: 12 }, x: 300, y: -50, fixed: true },
+            { id: 'get_patient_encounters', label: 'get_patient_\nencounters', color: '#9C27B0', shape: 'box', font: { color: 'white', size: 12 }, x: 300, y: 50, fixed: true },
+            { id: 'search_patients', label: 'search_patients', color: '#9C27B0', shape: 'box', font: { color: 'white', size: 12 }, x: 300, y: 150, fixed: true },
+            { id: 'get_database_schema', label: 'get_database_\nschema', color: '#9C27B0', shape: 'box', font: { color: 'white', size: 12 }, x: 300, y: 250, fixed: true },
+            { id: 'execute_custom_query', label: 'execute_custom_\nquery', color: '#F44336', shape: 'box', font: { color: 'white', size: 12 }, x: 300, y: 350, fixed: true },
 
-            // Cypher subgraph nodes (inside execute_custom_query)
-            { id: 'cypher_agent', label: 'Cypher Agent\n(LLM)', color: '#E91E63', shape: 'box', font: { color: 'white', size: 11 } },
-            { id: 'execute_cypher', label: 'execute_cypher_\nquery', color: '#9C27B0', shape: 'box', font: { color: 'white', size: 11 } }
+            // Cypher subgraph nodes (inside execute_custom_query) - positioned below execute_custom_query
+            { id: 'cypher_agent', label: 'Cypher Agent\n(LLM)', color: '#E91E63', shape: 'box', font: { color: 'white', size: 11 }, x: 450, y: 450, fixed: true },
+            { id: 'execute_cypher', label: 'execute_cypher_\nquery', color: '#9C27B0', shape: 'box', font: { color: 'white', size: 11 }, x: 450, y: 550, fixed: true }
         ]);
 
         const edges = new vis.DataSet([
@@ -431,7 +431,7 @@
             { from: 'validation', to: 'agent', arrows: 'to', width: 4, color: { color: '#FF5722' },
               label: 'relevant', font: { align: 'top', size: 11 }, smooth: { type: 'curvedCW', roundness: 0.2 } },
             { from: 'validation', to: 'END', arrows: 'to', width: 4, color: { color: '#FF5722' },
-              label: 'not relevant', font: { align: 'top', size: 11 }, smooth: { type: 'curvedCW', roundness: -0.2 } },
+              label: 'not relevant', font: { align: 'top', size: 11 }, smooth: { type: 'curvedCW', roundness: 0.1 } },
 
             // Conditional edges from agent to tools (showing as individual tools)
             { from: 'agent', to: 'get_patient_procedures', arrows: 'to', width: 4, color: { color: '#FF5722' },
@@ -449,9 +449,9 @@
             { from: 'agent', to: 'execute_custom_query', arrows: 'to', width: 4, color: { color: '#FF5722' },
               smooth: { type: 'curvedCW', roundness: -0.3 } },
 
-            // Conditional edge from agent directly to END (when no tools needed)
+            // Conditional edge from agent directly to END (when final answer is ready)
             { from: 'agent', to: 'END', arrows: 'to', width: 4, color: { color: '#FF5722' },
-              label: 'no tools', font: { align: 'top', size: 11 }, smooth: { type: 'curvedCW', roundness: -0.4 } },
+              label: 'final answer', font: { align: 'top', size: 11 }, smooth: { type: 'curvedCW', roundness: 0.1 } },
 
             // Return edges from tools back to agent (for synthesis)
             { from: 'get_patient_procedures', to: 'agent', arrows: 'to', width: 2, color: { color: '#666' },
@@ -484,16 +484,11 @@
         const options = {
             layout: {
                 hierarchical: {
-                    enabled: true,
-                    direction: 'UD',
-                    sortMethod: 'directed',
-                    nodeSpacing: 200,
-                    levelSeparation: 150,
-                    treeSpacing: 200
+                    enabled: false  // Disable hierarchical layout to use fixed positions
                 }
             },
             physics: {
-                enabled: false
+                enabled: false  // Disable physics to keep nodes in fixed positions
             },
             interaction: {
                 hover: true,
@@ -515,7 +510,7 @@
             edges: {
                 smooth: {
                     type: 'cubicBezier',
-                    forceDirection: 'vertical',
+                    forceDirection: 'horizontal',  // Changed to horizontal for left-to-right flow
                     roundness: 0.4
                 },
                 font: {

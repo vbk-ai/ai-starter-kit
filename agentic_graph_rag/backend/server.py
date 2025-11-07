@@ -59,11 +59,18 @@ class QueryInfo(BaseModel):
     question: Optional[str] = None
 
 
+class LatencyLog(BaseModel):
+    """Information about LLM or tool latency."""
+    name: str  # e.g., "LLM: Validation", "Tool: get_patient_procedures"
+    duration_ms: int  # Duration in milliseconds
+
+
 class ChatResponse(BaseModel):
     """Chat response model."""
     response: str
     session_id: str
     executed_queries: List[QueryInfo] = []
+    latency_logs: List[LatencyLog] = []
 
 
 @app.on_event("startup")
@@ -134,7 +141,7 @@ async def chat(request: ChatRequest):
             executed_queries_storage[request.session_id] = []
 
         # Query the agent
-        response, updated_history, executed_queries = query_agent(
+        response, updated_history, executed_queries, latency_logs = query_agent(
             agent,
             request.message,
             conversation_histories[request.session_id],
@@ -148,10 +155,14 @@ async def chat(request: ChatRequest):
         # Convert executed_queries to QueryInfo models
         query_infos = [QueryInfo(**q) for q in executed_queries] if executed_queries else []
 
+        # Convert latency_logs to LatencyLog models
+        latency_log_models = [LatencyLog(**log) for log in latency_logs] if latency_logs else []
+
         return ChatResponse(
             response=response,
             session_id=request.session_id,
-            executed_queries=query_infos
+            executed_queries=query_infos,
+            latency_logs=latency_log_models
         )
 
     except Exception as e:
@@ -210,7 +221,7 @@ async def get_provider():
     Returns:
         Current provider and model configuration
     """
-    from llm_factory import get_provider, get_main_agent_model, get_router_model, get_cypher_agent_model
+    from llm_factory import get_provider, get_main_agent_model, get_validation_model, get_cypher_agent_model
 
     current_provider = get_provider()
 
@@ -218,7 +229,7 @@ async def get_provider():
         "provider": current_provider,
         "models": {
             "main_agent": get_main_agent_model(),
-            "router": get_router_model(),
+            "validation": get_validation_model(),
             "cypher_agent": get_cypher_agent_model()
         }
     }
@@ -260,14 +271,14 @@ async def switch_provider(request: ProviderRequest):
         )
 
     # Get updated model configuration
-    from llm_factory import get_main_agent_model, get_router_model, get_cypher_agent_model
+    from llm_factory import get_main_agent_model, get_validation_model, get_cypher_agent_model
 
     return {
         "provider": provider,
         "message": f"Switched to {provider} provider",
         "models": {
             "main_agent": get_main_agent_model(),
-            "router": get_router_model(),
+            "validation": get_validation_model(),
             "cypher_agent": get_cypher_agent_model()
         }
     }

@@ -39,10 +39,17 @@ def create_sambanova_llm(
             "SAMBANOVA_API_KEY must be set in environment or passed as parameter"
         )
 
-    return ChatSambaNova(
-        model=model,
-        temperature=temperature,
-        sambanova_api_key=api_key,
-        timeout=30,  # 30-second timeout for HTTP requests
-        max_retries=2  # Retry up to 2 times on failure
-    )
+    # Build kwargs for ChatSambaNova
+    kwargs = {
+        "model": model,
+        "temperature": temperature,
+        "sambanova_api_key": api_key,
+        "timeout": 30,  # 30-second timeout for HTTP requests
+        "max_retries": 2  # Retry up to 2 times on failure
+    }
+
+    # Special case for gpt-oss-120b: set reasoning_effort to "medium"
+    if model == "gpt-oss-120b":
+        kwargs["reasoning_effort"] = "medium"
+
+    return ChatSambaNova(**kwargs)
