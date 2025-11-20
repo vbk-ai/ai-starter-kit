@@ -541,3 +541,166 @@ def test_validation_edge_case_database_schema_query(agent, conversation_state):
 
     print("\n✓ Test passed: Database schema query accepted by validation")
     print(f"✓ Response contains schema information")
+
+
+@pytest.mark.timeout(120)
+def test_find_similar_patients_tool(agent, conversation_state):
+    """
+    Test 14: find_similar_patients tool
+    Coverage: Patient similarity using KNN embeddings
+    Expected: Query returning similar patients with similarity scores and medical stats
+    Routing: Patient similarity query → find_similar_patients tool
+
+    This test verifies:
+    - Tool is invoked for similarity queries
+    - Returns list of similar patients with scores
+    - Includes medical stats (age, encounters, procedures, medications, expenses)
+    - Uses KNN_SIMILARITY relationship (Test 1 format from test_similarity_query.py)
+    """
+    print("\n" + "-" * 60)
+    print("Test 14: find_similar_patients Tool")
+    print("-" * 60)
+
+    question = "Find the most similar patients to Joi660 Barrows492"
+    print(f"Question: {question}\n")
+
+    response, conversation_state["history"], conversation_state["queries"], _ = query_agent(
+        agent, question, conversation_state["history"], conversation_state["queries"]
+    )
+
+    print("Response (FULL):")
+    print(response)
+    print(f"\n✓ Queries executed: {len(conversation_state['queries'])}")
+
+    # Verify at least one query was executed
+    assert len(conversation_state["queries"]) > 0, "No queries were executed"
+
+    # Verify the query source is find_similar_patients
+    latest = conversation_state["queries"][-1]
+    print(f"\nLatest Query:")
+    print(f"  Source: {latest['source']}")
+    print(f"  Tool Args: {latest.get('tool_args', {})}")
+
+    assert latest["source"] == "find_similar_patients", \
+        f"Expected source 'find_similar_patients', got '{latest['source']}'"
+
+    # Verify response contains expected elements
+    # Should have similarity scores, patient names, and medical stats
+    if "No similar patients found" not in response:
+        # Check for key elements in the response
+        assert "similar" in response.lower(), \
+            "Response should mention similar patients"
+
+        # Check for at least one of the medical statistics fields
+        has_medical_stats = any(keyword in response.lower() for keyword in
+            ["similarity score", "age", "encounters", "procedures", "medications", "expenses"])
+        assert has_medical_stats, \
+            "Response should include medical statistics (similarity score, age, encounters, etc.)"
+
+        print("\n✓ Test passed: find_similar_patients tool executed successfully")
+        print("✓ Response contains similarity scores and medical statistics")
+    else:
+        print("\n✓ Test passed: Tool executed (patient not found or no similarity data)")
+        print("  Note: This may indicate embeddings need to be generated")
+
+
+@pytest.mark.timeout(180)
+def test_multi_turn_conversation(agent, conversation_state):
+    """
+    Test 15: Multi-turn conversation with context preservation
+    Coverage: Multi-turn conversation maintaining context across questions
+    Expected: Agent correctly uses pronouns and context from previous questions
+    Routing:
+    - Turn 1: Analytics query → cypher subgraph
+    - Turn 2: Pronoun reference ("he") → should resolve to patient from Turn 1
+    - Turn 3: Similarity query ("him") → should use find_similar_patients with patient from Turn 1
+
+    This test verifies:
+    - Conversation history is maintained between turns
+    - Agent resolves pronoun references (he, him) correctly
+    - Context from earlier questions is used in later queries
+    - Multiple different tools/subgraphs can be used in sequence
+    """
+    print("\n" + "=" * 60)
+    print("Test 15: Multi-turn Conversation")
+    print("=" * 60)
+
+    # Turn 1: Which patient has spent the most on treatments?
+    print("\n" + "-" * 60)
+    print("Turn 1: Initial analytics query")
+    print("-" * 60)
+    question1 = "Which patient has spent the most on treatments?"
+    print(f"Question: {question1}\n")
+
+    response1, conversation_state["history"], conversation_state["queries"], _ = query_agent(
+        agent, question1, conversation_state["history"], conversation_state["queries"]
+    )
+
+    print("Response 1:")
+    print(response1)
+    print(f"\n✓ Queries executed after turn 1: {len(conversation_state['queries'])}")
+
+    # Verify first response contains a patient name and expense amount
+    # (Don't hardcode patient name as it may vary with database)
+    assert len(conversation_state["queries"]) > 0, "No queries were executed"
+    assert any(keyword in response1.lower() for keyword in ["spent", "expense", "treatment", "cost"]), \
+        "First response should mention treatment expenses"
+
+    # Extract patient name for validation in subsequent turns
+    # Response should contain a name pattern (FirstName LastName)
+    import re
+    patient_match = re.search(r'([A-Z][a-z]+\d*\s+[A-Z][a-z]+\d*)', response1)
+    assert patient_match, "First response should contain a patient name"
+    patient_name = patient_match.group(1)
+    print(f"✓ Identified patient: {patient_name}")
+
+    # Turn 2: how old is he?
+    print("\n" + "-" * 60)
+    print("Turn 2: Pronoun reference query (he)")
+    print("-" * 60)
+    question2 = "how old is he?"
+    print(f"Question: {question2}\n")
+
+    response2, conversation_state["history"], conversation_state["queries"], _ = query_agent(
+        agent, question2, conversation_state["history"], conversation_state["queries"]
+    )
+
+    print("Response 2:")
+    print(response2)
+    print(f"\n✓ Queries executed after turn 2: {len(conversation_state['queries'])}")
+
+    # Verify second response resolves "he" to the patient from turn 1
+    # Should contain age information
+    assert any(keyword in response2.lower() for keyword in ["age", "year", "old", "born"]), \
+        "Second response should contain age information"
+
+    # Turn 3: find patients similar to him
+    print("\n" + "-" * 60)
+    print("Turn 3: Similarity query with pronoun reference (him)")
+    print("-" * 60)
+    question3 = "find patients similar to him"
+    print(f"Question: {question3}\n")
+
+    response3, conversation_state["history"], conversation_state["queries"], _ = query_agent(
+        agent, question3, conversation_state["history"], conversation_state["queries"]
+    )
+
+    print("Response 3:")
+    print(response3)
+    print(f"\n✓ Queries executed after turn 3: {len(conversation_state['queries'])}")
+
+    # Verify third response uses similarity search
+    # Should mention similar patients
+    assert "similar" in response3.lower(), \
+        "Third response should mention similar patients"
+
+    # Print summary
+    print("\n" + "=" * 60)
+    print("Multi-turn Conversation Summary")
+    print("=" * 60)
+    print(f"✓ Total queries executed: {len(conversation_state['queries'])}")
+    print(f"✓ Conversation history entries: {len(conversation_state['history'])}")
+    print("✓ Turn 1: Identified patient with highest treatment costs")
+    print("✓ Turn 2: Resolved pronoun 'he' and returned age information")
+    print("✓ Turn 3: Resolved pronoun 'him' and found similar patients")
+    print("=" * 60)

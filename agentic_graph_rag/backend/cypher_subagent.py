@@ -237,6 +237,7 @@ class CypherSubgraphState(TypedDict):
     query_results: str
     llm_latency_ms: int  # Track Cypher LLM latency
     tool_latency_ms: int  # Track execute_cypher_query tool latency
+    cypher_model: str  # Model name used for Cypher generation
 
 
 # Tool for executing Cypher queries (used by subgraph)
@@ -473,7 +474,8 @@ Now help the user with their question!"""
         return {
             "messages": [response],
             "generated_cypher": generated_query,
-            "llm_latency_ms": llm_duration_ms
+            "llm_latency_ms": llm_duration_ms,
+            "cypher_model": model
         }
 
     # Create ToolNode

@@ -12,7 +12,8 @@ def create_llm(
     model: Optional[str] = None,
     temperature: float = 0.0,
     provider: Optional[str] = None,
-    api_key: Optional[str] = None
+    api_key: Optional[str] = None,
+    max_tokens: Optional[int] = None
 ) -> BaseChatModel:
     """
     Create an LLM instance based on provider configuration.
@@ -23,6 +24,7 @@ def create_llm(
         provider: Provider to use ('anthropic' or 'sambanova').
                  Defaults to PROVIDER env var or 'anthropic'.
         api_key: API key. If not provided, uses appropriate env var.
+        max_tokens: Maximum number of tokens to generate (optional)
 
     Returns:
         BaseChatModel instance (either Anthropic or SambaNova)
@@ -37,9 +39,9 @@ def create_llm(
     provider = provider.lower()
 
     if provider == "anthropic":
-        return _create_anthropic_llm(model, temperature, api_key)
+        return _create_anthropic_llm(model, temperature, api_key, max_tokens)
     elif provider == "sambanova":
-        return _create_sambanova_llm(model, temperature, api_key)
+        return _create_sambanova_llm(model, temperature, api_key, max_tokens)
     else:
         raise ValueError(f"Invalid provider: {provider}. Must be 'anthropic' or 'sambanova'")
 
@@ -47,7 +49,8 @@ def create_llm(
 def _create_anthropic_llm(
     model: Optional[str] = None,
     temperature: float = 0.0,
-    api_key: Optional[str] = None
+    api_key: Optional[str] = None,
+    max_tokens: Optional[int] = None
 ) -> BaseChatModel:
     """Create an Anthropic Claude LLM instance."""
     try:
@@ -71,18 +74,25 @@ def _create_anthropic_llm(
     if model is None:
         model = "claude-sonnet-4-5-20250929"
 
-    return ChatAnthropic(
-        model=model,
-        temperature=temperature,
-        api_key=api_key,
-        timeout=30.0  # 30-second timeout for HTTP requests
-    )
+    kwargs = {
+        "model": model,
+        "temperature": temperature,
+        "api_key": api_key,
+        "timeout": 30.0  # 30-second timeout for HTTP requests
+    }
+
+    # Add max_tokens if specified
+    if max_tokens is not None:
+        kwargs["max_tokens"] = max_tokens
+
+    return ChatAnthropic(**kwargs)
 
 
 def _create_sambanova_llm(
     model: Optional[str] = None,
     temperature: float = 0.0,
-    api_key: Optional[str] = None
+    api_key: Optional[str] = None,
+    max_tokens: Optional[int] = None
 ) -> BaseChatModel:
     """Create a SambaNova LLM instance."""
     from sambanova_llm import create_sambanova_llm
@@ -103,7 +113,8 @@ def _create_sambanova_llm(
     return create_sambanova_llm(
         model=model,
         temperature=temperature,
-        api_key=api_key
+        api_key=api_key,
+        max_tokens=max_tokens
     )
 
 
@@ -117,7 +128,7 @@ def get_model_for_role(role: str) -> str:
     Get the configured model for a specific role based on the active provider.
 
     Args:
-        role: The role name - one of 'MAIN_AGENT', 'VALIDATION', or 'CYPHER_AGENT'
+        role: The role name - one of 'MAIN_AGENT', 'VALIDATION', 'CYPHER_AGENT', or 'SYNTHESIS'
 
     Returns:
         Model name for the specified role
@@ -125,7 +136,7 @@ def get_model_for_role(role: str) -> str:
     Raises:
         ValueError: If role is invalid
     """
-    valid_roles = ['MAIN_AGENT', 'VALIDATION', 'CYPHER_AGENT']
+    valid_roles = ['MAIN_AGENT', 'VALIDATION', 'CYPHER_AGENT', 'SYNTHESIS']
     if role not in valid_roles:
         raise ValueError(f"Invalid role: {role}. Must be one of {valid_roles}")
 
@@ -140,13 +151,15 @@ def get_model_for_role(role: str) -> str:
         defaults = {
             "MAIN_AGENT": "claude-sonnet-4-5-20250929",
             "VALIDATION": "claude-haiku-4-5-20251001",  # Fast validation with Haiku
-            "CYPHER_AGENT": "claude-sonnet-4-5-20250929"
+            "CYPHER_AGENT": "claude-sonnet-4-5-20250929",
+            "SYNTHESIS": "claude-sonnet-4-5-20250929"
         }
     elif provider == "sambanova":
         defaults = {
             "MAIN_AGENT": "DeepSeek-V3.1",
             "VALIDATION": "DeepSeek-V3.1",
-            "CYPHER_AGENT": "DeepSeek-V3.1"
+            "CYPHER_AGENT": "DeepSeek-V3.1",
+            "SYNTHESIS": "DeepSeek-V3.1"
         }
     else:
         raise ValueError(f"Unknown provider: {provider}")
@@ -167,3 +180,8 @@ def get_validation_model() -> str:
 def get_cypher_agent_model() -> str:
     """Get the configured cypher agent model from environment."""
     return get_model_for_role("CYPHER_AGENT")
+
+
+def get_synthesis_model() -> str:
+    """Get the configured synthesis model from environment."""
+    return get_model_for_role("SYNTHESIS")

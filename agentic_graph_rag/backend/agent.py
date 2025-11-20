@@ -6,7 +6,7 @@ import time
 from datetime import datetime
 from typing import Annotated, TypedDict, Sequence
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, ToolMessage
-from llm_factory import create_llm, get_main_agent_model, get_validation_model
+from llm_factory import create_llm, get_main_agent_model, get_validation_model, get_synthesis_model
 from langchain_core.tools import tool, InjectedToolCallId
 from langgraph.graph import StateGraph, END
 from langgraph.prebuilt import ToolNode
@@ -457,6 +457,129 @@ def get_database_schema(tool_call_id: Annotated[str, InjectedToolCallId] = None)
 
 
 @tool
+@traceable(name="find_similar_patients", run_type="tool", tags=["tool", "patient", "similarity"])
+def find_similar_patients(patient_name: str, limit: int = 5, tool_call_id: Annotated[str, InjectedToolCallId] = None) -> Command:
+    """
+    Find patients who are most similar to a given patient based on their medical history,
+    encounters, procedures, medications, demographics, and expenses.
+
+    This tool uses KNN (K-Nearest Neighbors) similarity based on embeddings that combine:
+    - Encounter patterns (types and frequency of medical visits)
+    - Procedure history (types and frequency of procedures)
+    - Medication history (types and frequency of drugs prescribed)
+    - Demographics (age)
+    - Healthcare utilization (total encounters, expenses)
+
+    Use this when users ask to:
+    - Find similar patients
+    - Compare a patient to others
+    - Identify patients with similar medical profiles or journeys
+
+    Args:
+        patient_name: The patient's name (can be first name, last name, or full name like 'John Smith')
+        limit: Maximum number of similar patients to return (default: 5)
+        tool_call_id: Internal parameter for tracking (automatically provided by LangGraph)
+
+    Returns:
+        Command object that updates both LLM-visible messages and internal query tracking state.
+    """
+    log("TOOL", f"Called with patient_name='{patient_name}', limit={limit}", "find_similar_patients")
+
+    # Track tool execution latency
+    start_time = time.time()
+
+    try:
+        # Import here to avoid circular dependencies and only load when needed
+        from patient_similarity_embeddings import PatientSimilarityEmbeddings
+
+        # Initialize the embeddings generator
+        embeddings_gen = PatientSimilarityEmbeddings()
+
+        try:
+            # Find similar patients using KNN_SIMILARITY (as per test 1)
+            similar_patients = embeddings_gen.find_similar_patients(
+                patient_name=patient_name,
+                k=limit,
+                similarity_type='KNN_SIMILARITY'
+            )
+
+            if not similar_patients:
+                log("TOOL", f"No similar patients found for '{patient_name}'", "find_similar_patients")
+                output = f"No similar patients found for '{patient_name}'. The patient may not exist or has no similarity relationships."
+            else:
+                source_patient = similar_patients[0]['source_patient']
+                output = f"Top {len(similar_patients)} patients most similar to {source_patient}:\n\n"
+
+                for i, patient in enumerate(similar_patients, 1):
+                    output += f"{i}. {patient['similar_patient']}\n"
+                    output += f"   Similarity Score: {patient['similarity_score']:.4f}\n"
+                    output += f"   Age: {patient.get('age', 'N/A')}\n"
+                    output += f"   Total Encounters: {patient.get('total_encounters', 0)}\n"
+                    output += f"   Procedures: {patient.get('procedure_count', 0)}\n"
+                    output += f"   Medications: {patient.get('drug_count', 0)}\n"
+                    output += f"   Total Expenses: ${patient.get('expenses', 0):,.2f}\n\n"
+
+                log("TOOL", f"Found {len(similar_patients)} similar patients", "find_similar_patients")
+
+            # Build a pseudo-query for tracking purposes
+            # (The actual implementation uses the GDS library, not a direct Cypher query)
+            query = f"""
+            MATCH (p:Patient)-[sim:KNN_SIMILARITY]-(similar:Patient)
+            WHERE p.firstName + ' ' + p.lastName CONTAINS $patient_name
+            RETURN similar
+            ORDER BY sim.similarityScore DESC
+            LIMIT $limit
+            """
+
+            params = {"patient_name": patient_name, "limit": limit}
+
+        finally:
+            # Always close the connection
+            embeddings_gen.close()
+
+        # Calculate latency
+        duration_ms = round((time.time() - start_time) * 1000)
+
+        # Create query tracking entry
+        query_entry = {
+            "query": query,
+            "params": params,
+            "source": "find_similar_patients",
+            "tool_args": {"patient_name": patient_name, "limit": limit},
+            "timestamp": datetime.now().isoformat()
+        }
+
+        # Create latency log entry
+        latency_entry = {
+            "name": "Tool: find_similar_patients",
+            "duration_ms": duration_ms
+        }
+
+        return Command(
+            update={
+                "messages": [ToolMessage(content=output, tool_call_id=tool_call_id or "")],
+                "executed_queries": [query_entry],
+                "latency_logs": [latency_entry]
+            }
+        )
+
+    except Exception as e:
+        log("TOOL", f"Error - {str(e)}", "find_similar_patients", level="error")
+        error_msg = f"Error finding similar patients: {str(e)}"
+        duration_ms = round((time.time() - start_time) * 1000)
+
+        return Command(
+            update={
+                "messages": [ToolMessage(content=error_msg, tool_call_id=tool_call_id or "")],
+                "latency_logs": [{
+                    "name": "Tool: find_similar_patients",
+                    "duration_ms": duration_ms
+                }]
+            }
+        )
+
+
+@tool
 @traceable(name="execute_custom_query", run_type="tool", tags=["tool", "custom", "cypher"])
 def execute_custom_query(user_question: str, tool_call_id: Annotated[str, InjectedToolCallId] = None) -> Command:
     """
@@ -500,16 +623,18 @@ def execute_custom_query(user_question: str, tool_call_id: Annotated[str, Inject
             "cypher_explanation": "",
             "query_results": "",
             "llm_latency_ms": 0,
-            "tool_latency_ms": 0
+            "tool_latency_ms": 0,
+            "cypher_model": ""
         })
 
         # Extract the response and generated cypher
         response = subgraph_result["messages"][-1].content if subgraph_result["messages"] else "No response"
         generated_cypher = subgraph_result.get("generated_cypher", "")
 
-        # Extract latency information from subgraph
+        # Extract latency information and model from subgraph
         llm_latency = subgraph_result.get("llm_latency_ms", 0)
         tool_latency = subgraph_result.get("tool_latency_ms", 0)
+        cypher_model = subgraph_result.get("cypher_model", "")
 
         # Create query tracking entry with all details
         query_entry = {
@@ -526,7 +651,8 @@ def execute_custom_query(user_question: str, tool_call_id: Annotated[str, Inject
         if llm_latency > 0:
             latency_logs.append({
                 "name": "LLM: Cypher",
-                "duration_ms": llm_latency
+                "duration_ms": llm_latency,
+                "model": cypher_model
             })
         if tool_latency > 0:
             latency_logs.append({
@@ -596,6 +722,7 @@ tools = [
     get_patient_encounters,
     search_patients,
     get_database_schema,
+    find_similar_patients,
     execute_custom_query  # Added back for main agent to handle analytics
 ]
 
@@ -637,16 +764,25 @@ def create_agent(api_key: str = None):
     Returns:
         Compiled LangGraph agent
     """
-    # Initialize LLM (using configured provider and model)
-    model = get_main_agent_model()
-    llm = create_llm(
-        model=model,
+    # Initialize Main Agent LLM (for tool selection and initial responses)
+    main_model = get_main_agent_model()
+    main_llm = create_llm(
+        model=main_model,
         temperature=0,
         api_key=api_key
     )
 
-    # Bind tools to LLM
-    llm_with_tools = llm.bind_tools(tools)
+    # Initialize Synthesis LLM (for synthesizing tool results into final responses)
+    synthesis_model = get_synthesis_model()
+    synthesis_llm = create_llm(
+        model=synthesis_model,
+        temperature=0,
+        api_key=api_key,
+        max_tokens=3000  # Set max tokens for synthesis responses
+    )
+
+    # Bind tools to Main LLM
+    llm_with_tools = main_llm.bind_tools(tools)
 
     # ========================================================================
     # Validation Node Function
@@ -685,15 +821,31 @@ def create_agent(api_key: str = None):
         # Get database schema for validation context
         schema_description = neo4j_conn.get_database_schema()
 
-        # Validation prompt with schema context
+        # Build conversation history context
+        conversation_context = ""
+        if len(messages) > 1:
+            # Get previous messages (excluding the current user query)
+            previous_messages = []
+            for msg in messages[:-1]:
+                if isinstance(msg, HumanMessage):
+                    previous_messages.append(f"User: {msg.content}")
+                elif isinstance(msg, AIMessage):
+                    previous_messages.append(f"Assistant: {msg.content}")
+
+            if previous_messages:
+                conversation_context = "\nCONVERSATION HISTORY:\n" + "\n".join(previous_messages[-6:]) + "\n"
+
+        # Validation prompt with schema and conversation context
         validation_prompt = f"""You are a query validator for the Synthea medical records database.
 
 DATABASE SCHEMA:
 {schema_description}
+{conversation_context}
+CURRENT USER QUERY: {user_query}
 
-USER QUERY: {user_query}
+Your task: Determine if the user's current query is relevant to this medical database.
 
-Your task: Determine if the user's query is relevant to this medical database.
+IMPORTANT: Consider the conversation history when evaluating the query. Pronouns (he, she, they, him, her, them) or contextual references (that patient, those medications, etc.) should be evaluated based on what they refer to in the conversation history.
 
 RELEVANT queries include:
 - Questions about patients, their medical history, procedures, conditions, medications
@@ -701,6 +853,7 @@ RELEVANT queries include:
 - Statistical queries about medical data (counts, averages, trends)
 - Searching for or retrieving medical records
 - Questions about the database structure or schema
+- Follow-up questions that reference previous medical queries (even if using pronouns)
 
 IRRELEVANT queries include:
 - General knowledge questions unrelated to medical records
@@ -721,7 +874,8 @@ Classify this query as relevant (True) or irrelevant (False)."""
             # Create latency log entry
             latency_entry = {
                 "name": "LLM: Validation",
-                "duration_ms": duration_ms
+                "duration_ms": duration_ms,
+                "model": validation_model
             }
 
             if not decision.is_relevant:
@@ -784,8 +938,34 @@ Classify this query as relevant (True) or irrelevant (False)."""
 
         log("APP", f"call_model invoked: incrementing iteration from {current_iteration} to {new_iteration}")
 
-        # Detect if we have tool results (synthesis mode)
-        has_tool_results = any(isinstance(msg, ToolMessage) for msg in messages[-10:])
+        # Find the index of the most recent HumanMessage to identify the current turn
+        last_human_idx = None
+        for i in range(len(messages) - 1, -1, -1):
+            if isinstance(messages[i], HumanMessage):
+                last_human_idx = i
+                break
+
+        # Detect if we have tool results in the CURRENT turn (synthesis mode)
+        has_tool_results = False
+        if last_human_idx is not None and new_iteration > 1:
+            # Check messages after the last HumanMessage for ToolMessages (current turn only)
+            current_turn_messages = messages[last_human_idx + 1:]
+            has_tool_results = any(isinstance(msg, ToolMessage) for msg in current_turn_messages)
+
+        # Filter messages for LLM: keep only HumanMessage and AIMessage from previous turns
+        # Keep ALL message types from the current turn
+        filtered_messages = []
+        for i, msg in enumerate(messages):
+            if i <= (last_human_idx or 0):
+                # For previous turns and the current HumanMessage, keep only Human and AI messages
+                if isinstance(msg, (HumanMessage, AIMessage)):
+                    filtered_messages.append(msg)
+            else:
+                # For current turn after HumanMessage, keep all messages (including ToolMessage)
+                filtered_messages.append(msg)
+
+        # Use filtered messages for the rest of the function
+        messages = filtered_messages
 
         # Add system message if this is the first message
         if len(messages) == 1:
@@ -807,6 +987,7 @@ TOOL SELECTION GUIDELINES:
 - get_patient_encounters: When users ask about a specific patient's encounters/visits. Use the patient's name (first, last, or full name).
 - search_patients: When you need to find or search for patients by name. Returns a list of matching patients.
 - get_database_schema: When users ask about database structure or schema information.
+- find_similar_patients: When users ask to find patients similar to a specific patient based on their medical history, demographics, and healthcare utilization. Returns patients with similar medical profiles/journeys.
 
 **Use execute_custom_query for complex analytics:**
 - Aggregations and counts ("How many patients...", "What's the total...", "Average age...")
@@ -834,6 +1015,13 @@ Patient names in this database are synthetic and may include numbers (e.g., "Eth
 - Don't ask for clarification or treat these as IDs - they are the actual names in the database
 - Tools can match patients using just the first name, just the last name, or the full name - simply pass whatever name the user provides to the tool and let it handle the matching
 
+**CONVERSATION CONTEXT AND PRONOUNS:**
+IMPORTANT: Review the conversation history to resolve pronoun references (he, she, they, him, her, them) and contextual references (that patient, those medications, etc.).
+- If the user asks "how old is he?", look at the conversation history to identify which patient was previously discussed
+- If the user asks "find patients similar to him", identify the patient from the conversation history
+- Use the exact patient name from the conversation history when making tool calls
+- Example: If the previous question was about "Dudley365 Spencer878" and the user asks "how old is he?", use execute_custom_query to get Dudley365 Spencer878's age
+
 Always be clear and helpful in your responses. If a patient is not found, suggest searching by name."""
 
             messages = [HumanMessage(content=system_message)] + messages
@@ -847,20 +1035,36 @@ Always be clear and helpful in your responses. If a patient is not found, sugges
 
             synthesis_instruction = """You have received results from your tool calls.
 
-*** CRITICAL RULE #1 - LIMIT LANGUAGE ***
+*** IMPORTANT: RESPECTFUL COMMUNICATION ***
+Your response must be respectful, professional, and helpful at all times:
+- Use a polite, supportive, and empathetic tone
+- Never include harsh, rude, or confrontational language
+- Avoid any content that could be considered hate speech, discriminatory, or offensive
+- Be patient and understanding, even if the user's question cannot be fully answered
+- Frame limitations or missing information in a helpful, constructive way
+- Treat all patients, demographics, and medical conditions with dignity and respect
+
+*** CRITICAL RULE #1 - NO HALLUCINATION ***
+DO NOT HALLUCINATE OR MAKE UP INFORMATION!
+- ONLY use information that is explicitly present in the tool results
+- If the tool results do not contain information that answers the user's question, respond EXACTLY with: "I am sorry, I do not have the answer to your question"
+- DO NOT infer, guess, or extrapolate beyond what the tool results explicitly state
+- If you cannot answer the user's question based on the tool results, acknowledge this truthfully with the exact apology message above
+
+*** CRITICAL RULE #2 - LIMIT LANGUAGE ***
 DO NOT ADD PHRASES LIKE "showing up to 30" OR "top 30" UNLESS THE TOOL OUTPUT CONTAINS THEM!
 - Check the FIRST LINE of the tool result message
 - If it says "(showing up to X most recent)" → copy that exact phrase
 - If it does NOT have that phrase → do NOT add any "showing up to" or "top X" language
 - Instead, just state the actual count (e.g., "has 21 medications")
 
-*** CRITICAL RULE #2 - PATIENT IDs ***
+*** CRITICAL RULE #3 - PATIENT IDs ***
 DO NOT include patient IDs (UUIDs like "34363d95-4e03-4910-5018-3cabddcc50a3") in your response UNLESS the user specifically asked for IDs.
 - Only show patient names and other relevant clinical information
 - IDs are internal database identifiers that are not useful to users in most cases
 - Exception: If the user explicitly asks "show me the patient ID" or similar, then include it
 
-*** CRITICAL RULE #3 - MARKDOWN FORMATTING ***
+*** CRITICAL RULE #4 - MARKDOWN FORMATTING ***
 Your response will be rendered as Markdown in the UI.
 
 IMPORTANT LIST FORMATTING - Use this EXACT format (no trailing spaces, no blank lines):
@@ -914,11 +1118,26 @@ FORMATTING GUIDELINES:
 - Use lists for each data type if appropriate
 - Example: "John Smith has had several procedures including an Electrocardiogram on 2023-06-15 and a Chest X-ray on 2023-03-22. He is currently taking Metformin for Type 2 Diabetes and Lisinopril for Hypertension."
 
+**For Similar Patient Results (from find_similar_patients tool):**
+- ALWAYS use Markdown table format for better readability
+- Include ALL available columns: Patient Name, Similarity Score, Age, Encounters, Procedures, Medications, and Total Expenses
+- Format similarity scores to 4 decimal places (e.g., 0.8557)
+- Format expenses with dollar sign and commas (e.g., $232,720.06)
+- Example table format:
+```
+Here are the top 5 patients most similar to [Patient Name]:
+
+| Patient Name | Similarity | Age | Encounters | Procedures | Medications | Total Expenses |
+|--------------|------------|-----|------------|------------|-------------|----------------|
+| John Smith | 0.8557 | 43 | 44 | 43 | 3 | $232,720.06 |
+| Jane Doe | 0.8543 | 43 | 51 | 39 | 6 | $211,810.82 |
+```
+
 CRITICAL RULES:
 - Use EXACT numbers, dates, and amounts from tool results - don't approximate
 - Don't add uncertainty phrases like "approximately" or "based on available information" when complete data is provided
 - Plain natural language ONLY - NO Cypher queries, SQL, or code in your response
-- NO special tags or table formatting with pipes (|) or dashes (-)
+- NO table formatting with pipes (|) or dashes (-) EXCEPT for similar patient results from find_similar_patients tool
 - PRESERVE RESULT COUNT LANGUAGE: If the tool output mentions a specific count (e.g., "showing up to 30") or doesn't mention a limit at all, use that exact language. DO NOT add phrases like "top 30" or "most recent 30" if the tool output doesn't include them.
 - When the tool output contains a numbered or bulleted list, preserve that list format in your response
 - FORMAT TIMESTAMPS: Convert ISO 8601 timestamps (e.g., "2023-01-01T12:48:47.000000000+00:00") to natural date format (e.g., "January 1, 2023" or "2023-01-01"). Strip time and timezone unless specifically relevant.
@@ -927,9 +1146,21 @@ Provide your synthesized answer now:"""
 
             messages = messages + [HumanMessage(content=synthesis_instruction)]
 
-        # Track main agent LLM latency
+        # Track LLM latency and invoke appropriate LLM
         start_time = time.time()
-        response = llm_with_tools.invoke(messages)
+
+        # Use synthesis LLM if we have tool results, otherwise use main LLM with tools
+        if has_tool_results:
+            # Synthesis mode: use synthesis LLM (no tool binding needed)
+            response = synthesis_llm.invoke(messages)
+            llm_name = "LLM: Synthesis"
+            log("AGENT", "Using SYNTHESIS_LLM for response synthesis", "MAIN")
+        else:
+            # Initial call: use main agent LLM with tools
+            response = llm_with_tools.invoke(messages)
+            llm_name = "LLM: Main"
+            log("AGENT", "Using MAIN_AGENT_LLM for tool selection", "MAIN")
+
         duration_ms = round((time.time() - start_time) * 1000)
 
         if hasattr(response, 'content') and response.content:
@@ -937,11 +1168,13 @@ Provide your synthesized answer now:"""
         if hasattr(response, 'tool_calls') and response.tool_calls:
             log("AGENT", f"Made tool calls: {[tc['name'] for tc in response.tool_calls]}", "MAIN")
 
-        # Determine if this is synthesis mode or initial call
-        llm_name = "LLM: Synthesis" if has_tool_results else "LLM: Main"
+        # Determine which model was used based on llm_name
+        model_used = synthesis_model if llm_name == "LLM: Synthesis" else main_model
+
         latency_entry = {
             "name": llm_name,
-            "duration_ms": duration_ms
+            "duration_ms": duration_ms,
+            "model": model_used
         }
 
         return {

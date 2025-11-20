@@ -63,6 +63,7 @@ class LatencyLog(BaseModel):
     """Information about LLM or tool latency."""
     name: str  # e.g., "LLM: Validation", "Tool: get_patient_procedures"
     duration_ms: int  # Duration in milliseconds
+    model: Optional[str] = None  # Model name for LLM calls (e.g., "gpt-oss-120b")
 
 
 class ChatResponse(BaseModel):
@@ -221,7 +222,7 @@ async def get_provider():
     Returns:
         Current provider and model configuration
     """
-    from llm_factory import get_provider, get_main_agent_model, get_validation_model, get_cypher_agent_model
+    from llm_factory import get_provider, get_main_agent_model, get_validation_model, get_cypher_agent_model, get_synthesis_model
 
     current_provider = get_provider()
 
@@ -230,7 +231,8 @@ async def get_provider():
         "models": {
             "main_agent": get_main_agent_model(),
             "validation": get_validation_model(),
-            "cypher_agent": get_cypher_agent_model()
+            "cypher_agent": get_cypher_agent_model(),
+            "synthesis": get_synthesis_model()
         }
     }
 
@@ -271,7 +273,7 @@ async def switch_provider(request: ProviderRequest):
         )
 
     # Get updated model configuration
-    from llm_factory import get_main_agent_model, get_validation_model, get_cypher_agent_model
+    from llm_factory import get_main_agent_model, get_validation_model, get_cypher_agent_model, get_synthesis_model
 
     return {
         "provider": provider,
@@ -279,7 +281,8 @@ async def switch_provider(request: ProviderRequest):
         "models": {
             "main_agent": get_main_agent_model(),
             "validation": get_validation_model(),
-            "cypher_agent": get_cypher_agent_model()
+            "cypher_agent": get_cypher_agent_model(),
+            "synthesis": get_synthesis_model()
         }
     }
 

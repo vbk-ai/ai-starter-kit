@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LangGraph Visualization - Agentic Graph RAG</title>
+    <link rel="icon" type="image/x-icon" href="https://sambanova.ai/hubfs/sn-new-icon-fav.png">
     <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
     <style>
         * {
@@ -14,7 +15,7 @@
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #A2297D 0%, #4E226B 100%);
             height: 100vh;
             display: flex;
             justify-content: center;
@@ -35,7 +36,7 @@
         }
 
         .header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #A2297D 0%, #4E226B 100%);
             color: white;
             padding: 25px 30px;
             display: flex;
@@ -164,11 +165,11 @@
             border-radius: 6px;
             margin-bottom: 8px;
             font-size: 13px;
-            border-left: 3px solid #667eea;
+            border-left: 3px solid #A2297D;
         }
 
         .node-item strong {
-            color: #667eea;
+            color: #A2297D;
         }
 
         .subgraph-section {
@@ -200,7 +201,7 @@
             width: 100%;
             padding: 8px 15px;
             margin-bottom: 8px;
-            background: #667eea;
+            background: #A2297D;
             color: white;
             border: none;
             border-radius: 6px;
@@ -210,7 +211,7 @@
         }
 
         .control-button:hover {
-            background: #5568d3;
+            background: #8A2269;
         }
 
         .control-button:last-child {
@@ -220,7 +221,7 @@
         .node-tooltip {
             position: absolute;
             background: white;
-            border: 2px solid #667eea;
+            border: 2px solid #A2297D;
             border-radius: 8px;
             padding: 15px;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
@@ -237,7 +238,7 @@
         .tooltip-title {
             font-size: 16px;
             font-weight: 600;
-            color: #667eea;
+            color: #A2297D;
             margin-bottom: 10px;
             padding-bottom: 8px;
             border-bottom: 1px solid #e0e0e0;
@@ -258,6 +259,26 @@
             font-size: 13px;
             color: #666;
             margin-bottom: 4px;
+        }
+
+        /* Footer with SambaNova logo */
+        .footer {
+            padding: 15px 30px;
+            background: #f8f9fa;
+            border-top: 1px solid #e0e0e0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .footer img {
+            height: 25px;
+            opacity: 0.7;
+            transition: opacity 0.2s;
+        }
+
+        .footer img:hover {
+            opacity: 1;
         }
     </style>
 </head>
@@ -282,24 +303,12 @@
                         <span>Start/End</span>
                     </div>
                     <div class="legend-item">
-                        <div class="legend-color" style="background: #2196F3;"></div>
-                        <span>Validation</span>
-                    </div>
-                    <div class="legend-item">
                         <div class="legend-color" style="background: #FF9800;"></div>
-                        <span>Agent/LLM</span>
+                        <span>LLM</span>
                     </div>
                     <div class="legend-item">
                         <div class="legend-color" style="background: #9C27B0;"></div>
                         <span>Tool</span>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-color" style="background: #E91E63;"></div>
-                        <span>Cypher Agent</span>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-color" style="background: #F44336;"></div>
-                        <span>Custom Query Tool</span>
                     </div>
                 </div>
 
@@ -320,15 +329,37 @@
                 </div>
 
                 <div class="info-section">
-                    <h3>Main Graph Nodes</h3>
+                    <h3>Agent Nodes</h3>
                     <div class="node-list">
-                        <div class="node-item">
-                            <strong>validation</strong><br>
+                        <div class="node-item" style="border-left-color: #FF9800;">
+                            <strong>Validation Agent</strong><br>
                             Validates query relevance to Synthea database
+                            <div style="margin-top: 8px; padding-left: 12px; border-left: 2px solid #ddd;">
+                                <span style="font-size: 11px; color: #666;">
+                                    <strong>LLM:</strong> <span id="validation-model">Loading...</span>
+                                </span>
+                            </div>
                         </div>
-                        <div class="node-item">
-                            <strong>agent</strong><br>
-                            Main LLM agent with tool-calling capabilities
+                        <div class="node-item" style="border-left-color: #FF9800;">
+                            <strong>Main Agent</strong><br>
+                            Contains Main LLM (tool selection), all tools, and Synthesis LLM (result synthesis)
+                            <div style="margin-top: 8px; padding-left: 12px; border-left: 2px solid #ddd;">
+                                <span style="font-size: 11px; color: #666;">
+                                    <strong>Main LLM:</strong> <span id="main-agent-model">Loading...</span>
+                                </span><br>
+                                <span style="font-size: 11px; color: #666;">
+                                    <strong>Synthesis LLM:</strong> <span id="synthesis-model">Loading...</span>
+                                </span>
+                            </div>
+                        </div>
+                        <div class="node-item" style="border-left-color: #E91E63;">
+                            <strong>Cypher Agent</strong><br>
+                            Contains Cypher LLM (query generation) and execute_cypher_query tool
+                            <div style="margin-top: 8px; padding-left: 12px; border-left: 2px solid #ddd;">
+                                <span style="font-size: 11px; color: #666;">
+                                    <strong>LLM:</strong> <span id="cypher-agent-model">Loading...</span>
+                                </span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -367,21 +398,30 @@
                     </div>
                 </div>
 
-                <div class="subgraph-section">
-                    <h4>Cypher Subgraph (inside execute_custom_query)</h4>
-                    <p style="font-size: 12px; color: #5c6bc0;">
-                        <strong>Cypher Agent:</strong> LLM that generates Cypher queries<br>
+                <div class="subgraph-section" style="background: #fff3e0; border-left: 4px solid #FF9800;">
+                    <h4 style="color: #FF9800;">Main Agent Components</h4>
+                    <p style="font-size: 12px; color: #666;">
+                        <strong>Main LLM:</strong> Selects appropriate tools<br>
+                        <strong>Tools:</strong> Execute data retrieval operations<br>
+                        <strong>Synthesis LLM:</strong> Synthesizes tool results into natural language
+                    </p>
+                </div>
+
+                <div class="subgraph-section" style="background: #fce4ec; border-left: 4px solid #E91E63;">
+                    <h4 style="color: #E91E63;">Cypher Agent Components</h4>
+                    <p style="font-size: 12px; color: #666;">
+                        <strong>Cypher LLM:</strong> Generates Cypher queries<br>
                         <strong>execute_cypher_query:</strong> Executes queries and loops back for refinement
                     </p>
                 </div>
 
                 <div class="info-section">
                     <h3>About</h3>
-                    <p>This visualization shows the current LangGraph workflow architecture.</p>
-                    <p><strong>Flow:</strong> START → validation → agent → tools → agent (synthesis) → END</p>
-                    <p><strong>Conditional edges</strong> (thick, orange) represent dynamic routing decisions by the agent.</p>
+                    <p>This visualization shows the current LangGraph workflow architecture with agent groupings.</p>
+                    <p><strong>Flow:</strong> START → validation → Main LLM → tools → Synthesis LLM → END</p>
+                    <p><strong>Conditional edges</strong> (thick, orange) represent dynamic routing decisions.</p>
                     <p><strong>Regular edges</strong> (thin, solid) represent unconditional transitions.</p>
-                    <p><strong>Return edges</strong> (dashed) show tools returning results to the agent for synthesis.</p>
+                    <p><strong>Dashed boxes</strong> group related components into agents (Main Agent and Cypher Agent).</p>
                 </div>
             </div>
 
@@ -398,6 +438,12 @@
                 </div>
             </div>
         </div>
+
+        <div class="footer">
+            <a href="https://sambanova.ai/" target="_blank" rel="noopener noreferrer">
+                <img src="https://sambanova.ai/hs-fs/hubfs/sn-new-gray-logo.png" alt="SambaNova Systems">
+            </a>
+        </div>
     </div>
 
     <script type="text/javascript">
@@ -405,22 +451,33 @@
         const nodes = new vis.DataSet([
             // Main graph nodes with fixed positions (x increases left to right, y increases top to bottom)
             { id: 'START', label: 'START', color: '#4CAF50', shape: 'box', font: { color: 'white', size: 16, face: 'monospace' }, x: -600, y: 0, fixed: true },
-            { id: 'validation', label: 'VALIDATION\n(check relevance)', color: '#2196F3', shape: 'box', font: { color: 'white', size: 14 }, x: -300, y: 0, fixed: true },
-            { id: 'agent', label: 'AGENT\n(LLM + tools)', color: '#FF9800', shape: 'box', font: { color: 'white', size: 14 }, x: 0, y: 0, fixed: true },
-            { id: 'END', label: 'END', color: '#4CAF50', shape: 'box', font: { color: 'white', size: 16, face: 'monospace' }, x: -150, y: 200, fixed: true },
+            { id: 'validation', label: 'Validation LLM\n(check relevance)', color: '#FF9800', shape: 'box', font: { color: 'white', size: 14 }, x: -300, y: 0, fixed: true },
+            { id: 'agent', label: 'Main LLM\n(tool selection)', color: '#FF9800', shape: 'box', font: { color: 'white', size: 14 }, x: 0, y: 0, fixed: true },
+            { id: 'synthesis_llm', label: 'Synthesis LLM\n(result synthesis)', color: '#FF9800', shape: 'box', font: { color: 'white', size: 14 }, x: 600, y: 0, fixed: true },
+            { id: 'END', label: 'END', color: '#4CAF50', shape: 'box', font: { color: 'white', size: 16, face: 'monospace' }, x: 900, y: 0, fixed: true },
 
-            // Tool nodes (individual tools) - vertically aligned on the right, with cypher at the bottom
+            // Tool nodes (individual tools) - vertically aligned in the middle
             { id: 'get_patient_procedures', label: 'get_patient_\nprocedures', color: '#9C27B0', shape: 'box', font: { color: 'white', size: 12 }, x: 300, y: -250, fixed: true },
             { id: 'get_patient_conditions', label: 'get_patient_\nconditions', color: '#9C27B0', shape: 'box', font: { color: 'white', size: 12 }, x: 300, y: -150, fixed: true },
             { id: 'get_patient_medications', label: 'get_patient_\nmedications', color: '#9C27B0', shape: 'box', font: { color: 'white', size: 12 }, x: 300, y: -50, fixed: true },
             { id: 'get_patient_encounters', label: 'get_patient_\nencounters', color: '#9C27B0', shape: 'box', font: { color: 'white', size: 12 }, x: 300, y: 50, fixed: true },
             { id: 'search_patients', label: 'search_patients', color: '#9C27B0', shape: 'box', font: { color: 'white', size: 12 }, x: 300, y: 150, fixed: true },
             { id: 'get_database_schema', label: 'get_database_\nschema', color: '#9C27B0', shape: 'box', font: { color: 'white', size: 12 }, x: 300, y: 250, fixed: true },
-            { id: 'execute_custom_query', label: 'execute_custom_\nquery', color: '#F44336', shape: 'box', font: { color: 'white', size: 12 }, x: 300, y: 350, fixed: true },
+            { id: 'execute_custom_query', label: 'execute_custom_\nquery', color: '#9C27B0', shape: 'box', font: { color: 'white', size: 12 }, x: 300, y: 350, fixed: true },
 
-            // Cypher subgraph nodes (inside execute_custom_query) - positioned below execute_custom_query
-            { id: 'cypher_agent', label: 'Cypher Agent\n(LLM)', color: '#E91E63', shape: 'box', font: { color: 'white', size: 11 }, x: 450, y: 450, fixed: true },
-            { id: 'execute_cypher', label: 'execute_cypher_\nquery', color: '#9C27B0', shape: 'box', font: { color: 'white', size: 11 }, x: 450, y: 550, fixed: true }
+            // Cypher subgraph nodes (inside execute_custom_query) - positioned below Main Agent, horizontally aligned
+            { id: 'cypher_agent', label: 'Cypher LLM\n(query generation)', color: '#FF9800', shape: 'box', font: { color: 'white', size: 11 }, x: 200, y: 650, fixed: true },
+            { id: 'execute_cypher', label: 'execute_cypher_\nquery', color: '#9C27B0', shape: 'box', font: { color: 'white', size: 11 }, x: 400, y: 650, fixed: true },
+
+            // Group labels (background boxes for grouping visualization)
+            { id: 'main_agent_group', label: 'Main Agent', color: 'rgba(255,152,0,0.1)', shape: 'box',
+              font: { color: '#FF9800', size: 18, bold: true, vadjust: -380 },
+              x: 300, y: 50, fixed: true, size: 60, borderWidth: 3,
+              shapeProperties: { borderDashes: [10, 10] }, widthConstraint: { minimum: 800 }, heightConstraint: { minimum: 800 } },
+            { id: 'cypher_agent_group', label: 'Cypher Agent', color: 'rgba(233,30,99,0.1)', shape: 'box',
+              font: { color: '#E91E63', size: 16, bold: true, vadjust: -100 },
+              x: 300, y: 650, fixed: true, size: 40, borderWidth: 3,
+              shapeProperties: { borderDashes: [10, 10] }, widthConstraint: { minimum: 300 }, heightConstraint: { minimum: 230 } }
         ]);
 
         const edges = new vis.DataSet([
@@ -431,9 +488,9 @@
             { from: 'validation', to: 'agent', arrows: 'to', width: 4, color: { color: '#FF5722' },
               label: 'relevant', font: { align: 'top', size: 11 }, smooth: { type: 'curvedCW', roundness: 0.2 } },
             { from: 'validation', to: 'END', arrows: 'to', width: 4, color: { color: '#FF5722' },
-              label: 'not relevant', font: { align: 'top', size: 11 }, smooth: { type: 'curvedCW', roundness: 0.1 } },
+              label: 'not relevant', font: { align: 'top', size: 11 }, smooth: { type: 'curvedCW', roundness: -0.5 } },
 
-            // Conditional edges from agent to tools (showing as individual tools)
+            // Conditional edges from Main LLM to tools
             { from: 'agent', to: 'get_patient_procedures', arrows: 'to', width: 4, color: { color: '#FF5722' },
               smooth: { type: 'curvedCW', roundness: 0.3 } },
             { from: 'agent', to: 'get_patient_conditions', arrows: 'to', width: 4, color: { color: '#FF5722' },
@@ -449,32 +506,31 @@
             { from: 'agent', to: 'execute_custom_query', arrows: 'to', width: 4, color: { color: '#FF5722' },
               smooth: { type: 'curvedCW', roundness: -0.3 } },
 
-            // Conditional edge from agent directly to END (when final answer is ready)
-            { from: 'agent', to: 'END', arrows: 'to', width: 4, color: { color: '#FF5722' },
-              label: 'final answer', font: { align: 'top', size: 11 }, smooth: { type: 'curvedCW', roundness: 0.1 } },
+            // Return edges from tools to Synthesis LLM
+            { from: 'get_patient_procedures', to: 'synthesis_llm', arrows: 'to', width: 2, color: { color: '#666' },
+              smooth: { type: 'curvedCW', roundness: 0.3 } },
+            { from: 'get_patient_conditions', to: 'synthesis_llm', arrows: 'to', width: 2, color: { color: '#666' },
+              smooth: { type: 'curvedCW', roundness: 0.2 } },
+            { from: 'get_patient_medications', to: 'synthesis_llm', arrows: 'to', width: 2, color: { color: '#666' },
+              smooth: { type: 'curvedCW', roundness: 0.1 } },
+            { from: 'get_patient_encounters', to: 'synthesis_llm', arrows: 'to', width: 2, color: { color: '#666' },
+              smooth: { type: 'curvedCW', roundness: 0 } },
+            { from: 'search_patients', to: 'synthesis_llm', arrows: 'to', width: 2, color: { color: '#666' },
+              smooth: { type: 'curvedCW', roundness: -0.1 } },
+            { from: 'get_database_schema', to: 'synthesis_llm', arrows: 'to', width: 2, color: { color: '#666' },
+              smooth: { type: 'curvedCW', roundness: -0.2 } },
+            { from: 'execute_custom_query', to: 'synthesis_llm', arrows: 'to', width: 2, color: { color: '#666' },
+              smooth: { type: 'curvedCW', roundness: -0.3 } },
 
-            // Return edges from tools back to agent (for synthesis)
-            { from: 'get_patient_procedures', to: 'agent', arrows: 'to', width: 2, color: { color: '#666' },
-              smooth: { type: 'curvedCW', roundness: -0.3 }, dashes: true },
-            { from: 'get_patient_conditions', to: 'agent', arrows: 'to', width: 2, color: { color: '#666' },
-              smooth: { type: 'curvedCW', roundness: -0.2 }, dashes: true },
-            { from: 'get_patient_medications', to: 'agent', arrows: 'to', width: 2, color: { color: '#666' },
-              smooth: { type: 'curvedCW', roundness: -0.1 }, dashes: true },
-            { from: 'get_patient_encounters', to: 'agent', arrows: 'to', width: 2, color: { color: '#666' },
-              smooth: { type: 'curvedCW', roundness: 0 }, dashes: true },
-            { from: 'search_patients', to: 'agent', arrows: 'to', width: 2, color: { color: '#666' },
-              smooth: { type: 'curvedCW', roundness: 0.1 }, dashes: true },
-            { from: 'get_database_schema', to: 'agent', arrows: 'to', width: 2, color: { color: '#666' },
-              smooth: { type: 'curvedCW', roundness: 0.2 }, dashes: true },
-            { from: 'execute_custom_query', to: 'agent', arrows: 'to', width: 2, color: { color: '#666' },
-              smooth: { type: 'curvedCW', roundness: 0.3 }, dashes: true },
+            // Edge from Synthesis LLM to END
+            { from: 'synthesis_llm', to: 'END', arrows: 'to', width: 2, color: { color: '#666' } },
 
             // Cypher subgraph edges (within execute_custom_query)
-            { from: 'execute_custom_query', to: 'cypher_agent', arrows: 'to', width: 2, color: { color: '#F44336' },
-              label: 'subgraph', font: { align: 'top', size: 10, color: '#F44336' }, smooth: { type: 'curvedCW', roundness: 0.5 } },
+            { from: 'execute_custom_query', to: 'cypher_agent', arrows: 'to, from', width: 2, color: { color: '#666' },
+              label: 'subgraph', font: { align: 'top', size: 10 }, smooth: { type: 'curvedCW', roundness: -0.5 }, dashes: [5, 5] },
             { from: 'cypher_agent', to: 'execute_cypher', arrows: 'to', width: 2, color: { color: '#666' } },
             { from: 'execute_cypher', to: 'cypher_agent', arrows: 'to', width: 2, color: { color: '#666' },
-              label: 'loop', font: { align: 'top', size: 10 }, smooth: { type: 'curvedCW', roundness: 0.5 }, dashes: true }
+              label: 'loop', font: { align: 'top', size: 10 }, smooth: { type: 'curvedCW', roundness: 0.5 } }
         ]);
 
         // Create the network
@@ -594,11 +650,15 @@
                 },
                 'validation': {
                     title: 'Validation Node',
-                    description: 'Validates whether the user query is relevant to the Synthea medical database. Routes to agent if relevant, otherwise returns rejection message and ends.'
+                    description: 'Validates whether the user query is relevant to the Synthea medical database. Routes to Main LLM if relevant, otherwise returns rejection message and ends.'
                 },
                 'agent': {
-                    title: 'Agent Node',
-                    description: 'Main LLM-based agent with tool-calling capabilities. Selects appropriate tools based on user query, then synthesizes tool results into natural language responses.<ul class="tooltip-list"><li>First call: Tool selection</li><li>Second call: Result synthesis</li></ul>'
+                    title: 'Main LLM',
+                    description: 'Main LLM agent responsible for tool selection. Analyzes the user query and selects the appropriate tools to retrieve the necessary data. Part of the Main Agent group.'
+                },
+                'synthesis_llm': {
+                    title: 'Synthesis LLM',
+                    description: 'Dedicated LLM for synthesizing tool results into natural language responses. Takes raw tool outputs and creates user-friendly, conversational answers. Part of the Main Agent group.'
                 },
                 'get_patient_procedures': {
                     title: 'get_patient_procedures Tool',
@@ -629,12 +689,20 @@
                     description: 'Handles complex analytics queries using a Cypher subgraph. Used for:<ul class="tooltip-list"><li>Aggregations and counts</li><li>Top-N queries</li><li>Time-based analysis</li><li>Multi-entity relationships</li><li>Provider/organization queries</li></ul>'
                 },
                 'cypher_agent': {
-                    title: 'Cypher Agent (Subgraph)',
-                    description: 'LLM-based agent specialized in generating Cypher queries for the Synthea database. Has deep knowledge of the database schema and constructs optimized queries.'
+                    title: 'Cypher LLM (Cypher Agent)',
+                    description: 'Specialized LLM for generating Cypher queries for the Synthea database. Has deep knowledge of the database schema and constructs optimized queries. Part of the Cypher Agent group.'
                 },
                 'execute_cypher': {
                     title: 'execute_cypher_query Tool',
-                    description: 'Executes the generated Cypher query against Neo4j database. Results are returned to the Cypher Agent, which can refine the query if needed (loop back).'
+                    description: 'Executes the generated Cypher query against Neo4j database. Results are returned to the Cypher LLM, which can refine the query if needed (loop back). Part of the Cypher Agent group.'
+                },
+                'main_agent_group': {
+                    title: 'Main Agent',
+                    description: 'Group containing the Main LLM (tool selection), all tool nodes, and the Synthesis LLM (result synthesis). This represents the primary agent workflow.'
+                },
+                'cypher_agent_group': {
+                    title: 'Cypher Agent',
+                    description: 'Group containing the Cypher LLM (query generation) and execute_cypher_query tool. This represents the Cypher subgraph for custom analytics queries.'
                 },
                 'END': {
                     title: 'END',
@@ -647,6 +715,35 @@
 
         // Initial fit
         setTimeout(() => network.fit(), 100);
+
+        // Fetch and display model names
+        async function loadModelNames() {
+            try {
+                const response = await fetch('/provider');
+                if (!response.ok) {
+                    throw new Error('Failed to fetch model configuration');
+                }
+
+                const data = await response.json();
+                const models = data.models;
+
+                // Update the model names in the UI
+                document.getElementById('validation-model').textContent = models.validation;
+                document.getElementById('main-agent-model').textContent = models.main_agent;
+                document.getElementById('synthesis-model').textContent = models.synthesis;
+                document.getElementById('cypher-agent-model').textContent = models.cypher_agent;
+            } catch (error) {
+                console.error('Error loading model names:', error);
+                // Update with error message
+                document.getElementById('validation-model').textContent = 'Error loading';
+                document.getElementById('main-agent-model').textContent = 'Error loading';
+                document.getElementById('synthesis-model').textContent = 'Error loading';
+                document.getElementById('cypher-agent-model').textContent = 'Error loading';
+            }
+        }
+
+        // Load model names when page loads
+        loadModelNames();
     </script>
 </body>
 </html>
