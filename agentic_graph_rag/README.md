@@ -13,6 +13,7 @@ An AI-powered agentic system that enables natural language queries over the Synt
 - [API Endpoints](#api-endpoints)
 - [Agent Tools & Architecture](#agent-tools--architecture)
 - [Cypher Subagent Technical Guide](#cypher-subagent-technical-guide)
+- [Patient Similarity Embeddings](#patient-similarity-embeddings)
 - [Development](#development)
 - [Deployment](#deployment)
 - [What Was Built](#what-was-built)
@@ -139,8 +140,9 @@ Open your browser and go to: **http://localhost:8000/app**
 1. "What procedures has Ethan had?" (matches by first name)
 2. "Show me patients named John" (patient search)
 3. "What medications is taking Smith?" (matches by last name)
-4. "Which providers treated the most patients?" (analytics query)
-5. "How many patients are in the database?" (count aggregation)
+4. "Find patients similar to John Smith" (patient similarity)
+5. "Which providers treated the most patients?" (analytics query)
+6. "How many patients are in the database?" (count aggregation)
 
 ## Key Features
 
@@ -153,8 +155,13 @@ Open your browser and go to: **http://localhost:8000/app**
   - Provider-specific model configurations (main agent, validation, cypher agent)
   - Seamless provider switching without server restart
 - **Dual-Mode Querying**:
-  - Pre-built tools for common queries (patient procedures, conditions, medications, encounters, search)
+  - Pre-built tools for common queries (patient procedures, conditions, medications, encounters, search, similarity)
   - Custom query generation tool with Cypher subgraph for complex analytics
+- **Patient Similarity Matching**: Find patients with similar medical profiles using KNN embeddings based on:
+  - Encounter patterns (types and frequency of visits)
+  - Procedure history (types and frequency)
+  - Medication history (prescriptions)
+  - Demographics (age, expenses, healthcare utilization)
 - **Flexible Patient Matching**: Query by first name, last name, or full name
 - **Neo4j Integration**: Directly queries the Synthea-sample database
 - **RESTful API**: FastAPI backend with automatic documentation
@@ -187,19 +194,25 @@ Open your browser and go to: **http://localhost:8000/app**
 ```
 agentic_graph_rag/
 ├── backend/
-│   ├── agent.py               # Main LangGraph agent with tools
-│   ├── cypher_subagent.py     # Specialized Cypher query generator
-│   ├── neo4j_utils.py         # Neo4j connection utilities
-│   ├── server.py              # FastAPI server
-│   ├── .env                   # Environment configuration (not in git)
-│   └── .env.example           # Environment variables template
+│   ├── agent.py                           # Main LangGraph agent with 8 tools
+│   ├── cypher_subagent.py                 # Specialized Cypher query generator (subgraph)
+│   ├── neo4j_utils.py                     # Neo4j connection utilities
+│   ├── server.py                          # FastAPI server
+│   ├── patient_similarity_embeddings.py   # Patient similarity embeddings generator
+│   ├── README_EMBEDDINGS.md               # Patient embeddings setup guide
+│   ├── tests/                             # Test suite
+│   │   ├── test_connection.py            # Neo4j connection test
+│   │   ├── test_cypher.py                # Cypher generation tests
+│   │   ├── test_subgraph.py              # Subgraph integration tests
+│   │   └── test_query_tracking.py        # Query tracking system tests
+│   ├── .env                               # Environment configuration (not in git)
+│   └── .env.example                       # Environment variables template
 ├── frontend/
-│   └── index.html             # Web interface
-├── .gitignore                 # Git ignore rules
-├── requirements.txt           # Python dependencies
-├── test_connection.py         # Neo4j connection test
-├── test_cypher_subagent.py    # Cypher subagent tests
-└── README.md                  # This file
+│   ├── index.html                         # Web chat interface
+│   └── graph.html                         # LangGraph visualization
+├── .gitignore                             # Git ignore rules
+├── requirements.txt                       # Python dependencies
+└── README.md                              # This file
 ```
 
 ## Running the Application
@@ -266,6 +279,11 @@ For common patient-specific questions, the agent uses pre-built tools with flexi
 - "What encounters has Ethan had?"
 - "Show me hospital visits for John Smith"
 - "List encounters for Williams" (last name match)
+
+**Patient Similarity**
+- "Find patients similar to John Smith"
+- "Who are the most similar patients to Sarah?"
+- "Show me patients with similar medical profiles to Williams"
 
 **Name Matching Features:**
 - **First name only**: "Ethan" → matches any patient with first or last name containing "Ethan"
@@ -461,7 +479,7 @@ START → Validation → Agent → Tools → Agent (synthesis) → END
    - No separate router or summary nodes needed
 
 ### Available Tools
-The agent has access to 7 tools (all shown as individual nodes in the graph visualization):
+The agent has access to 8 tools (all shown as individual nodes in the graph visualization):
 
 #### Pre-built Patient Query Tools
 1. **get_patient_procedures**: Retrieve patient procedures (limit: 30)
@@ -470,9 +488,10 @@ The agent has access to 7 tools (all shown as individual nodes in the graph visu
 4. **get_patient_encounters**: Retrieve patient encounters (limit: 30)
 5. **search_patients**: Search for patients by name (limit: 30)
 6. **get_database_schema**: Get database schema information
+7. **find_similar_patients**: Find patients with similar medical profiles using KNN embeddings (limit: 5)
 
 #### Custom Analytics Tool (with Cypher Subgraph)
-7. **execute_custom_query**: Handles complex analytics using internal Cypher subgraph
+8. **execute_custom_query**: Handles complex analytics using internal Cypher subgraph
    - Contains its own specialized Cypher Agent (LLM with deep schema knowledge)
    - Internal execute_cypher_query tool for query execution
    - Unconditional edge from Cypher Agent → execute_cypher_query
@@ -481,7 +500,7 @@ The agent has access to 7 tools (all shown as individual nodes in the graph visu
 
 ### Conditional Edges
 - **From Validation**: Routes to Agent (relevant) or END (not relevant)
-- **From Agent to Tools**: Conditional edges to each of the 7 tools based on query analysis
+- **From Agent to Tools**: Conditional edges to each of the 8 tools based on query analysis
 - **From Agent to END**: Direct edge when no tools needed
 - **From Tools to Agent**: Return edges (dashed) for result synthesis
 
@@ -493,9 +512,10 @@ Validation
   ├─(relevant)──→ Agent ─┬─→ get_patient_procedures ──┐
   │                      ├─→ get_patient_conditions ───┤
   │                      ├─→ get_patient_medications ──┤
-  └─(not relevant)─→ END ├─→ get_patient_encounters ───├─→ Agent (synthesis) → END
-                         ├─→ search_patients ──────────┤
+  │                      ├─→ get_patient_encounters ───┤
+  └─(not relevant)─→ END ├─→ search_patients ──────────├─→ Agent (synthesis) → END
                          ├─→ get_database_schema ──────┤
+                         ├─→ find_similar_patients ────┤
                          ├─→ execute_custom_query ─────┘
                          │    (contains Cypher subgraph)
                          └─(no tools)──→ END
@@ -510,7 +530,7 @@ execute_custom_query (expanded):
 
 ### Architecture Visualization
 View the interactive graph visualization at: **http://localhost:8000/graph**
-- Shows all nodes (validation, agent, 7 tools, Cypher subgraph internals)
+- Shows all nodes (validation, agent, 8 tools, Cypher subgraph internals)
 - Displays conditional edges (thick orange) vs regular edges (thin gray)
 - Return edges (dashed) showing tool → agent flow
 - Click nodes for detailed tooltips
@@ -860,6 +880,108 @@ This streamlined architecture (validation → agent → tools → synthesis) com
 - **Query tracking** via Command pattern with reducers
 - **Visual representation** available at /graph endpoint
 
+## Patient Similarity Embeddings
+
+### Overview
+
+The patient similarity feature uses Neo4j Graph Data Science (GDS) library to generate high-dimensional embeddings that capture patient similarity based on multiple medical and demographic factors. This enables finding patients with similar medical journeys, which is useful for:
+
+- **Cohort identification**: Find similar patients for clinical studies
+- **Treatment planning**: Identify patients with comparable medical profiles
+- **Pattern discovery**: Understand common patient trajectories
+- **Personalized insights**: Compare a patient's journey to similar cases
+
+### How It Works
+
+The similarity system uses **KNN (K-Nearest Neighbors)** embeddings that combine:
+
+1. **Encounter Similarity (256D)**: Based on types and frequency of medical visits
+2. **Procedure Similarity (256D)**: Based on types and frequency of procedures
+3. **Drug Similarity (256D)**: Based on types and frequency of medications
+4. **Demographic Features**: Age, total encounters, expenses, income, etc.
+
+These are combined into a **775-dimensional feature space** that is then reduced to **256-dimensional KNN embeddings** using FastRP (Fast Random Projection).
+
+### Setup Instructions
+
+The patient similarity embeddings require the **Neo4j Graph Data Science (GDS) plugin** to be installed. See [backend/README_EMBEDDINGS.md](backend/README_EMBEDDINGS.md) for detailed setup instructions.
+
+**Quick Setup:**
+```bash
+# Install GDS plugin in Neo4j (via Neo4j Desktop or manual installation)
+# Then generate embeddings:
+cd backend
+source ../.venv/bin/activate
+python patient_similarity_embeddings.py
+```
+
+This will:
+1. Create aggregated patient relationships
+2. Generate similarity embeddings for encounters, procedures, and medications
+3. Create combined KNN similarity embeddings
+4. Establish similarity relationships between patients
+
+**Processing Time**: 10-30 minutes depending on database size (for 5,885 patients)
+
+### Using the Tool
+
+Once embeddings are generated, the agent can find similar patients:
+
+**Example Queries:**
+- "Find patients similar to John Smith"
+- "Who are the most similar patients to Sarah?"
+- "Show me patients with similar medical profiles to Williams"
+
+**Tool Response Includes:**
+- Similarity score (0.0 to 1.0)
+- Patient demographics (age)
+- Healthcare utilization metrics (total encounters, procedures, medications)
+- Total expenses
+
+### Technical Details
+
+**Similarity Relationship**: `KNN_SIMILARITY`
+- Created between patients with similar medical profiles
+- Contains `similarityScore` property (higher = more similar)
+- Top 25 nearest neighbors stored for each patient
+
+**Embedding Properties**:
+- `encounterSimilarityEmbed`: 256D vector
+- `procedureSimilarityEmbed`: 256D vector
+- `drugSimilarityEmbed`: 256D vector
+- `knnSimilarityEmbed`: 256D vector (recommended for queries)
+
+**Query Example** (executed by the tool):
+```cypher
+MATCH (p:Patient)-[sim:KNN_SIMILARITY]-(similar:Patient)
+WHERE p.firstName + ' ' + p.lastName CONTAINS $patient_name
+RETURN similar
+ORDER BY sim.similarityScore DESC
+LIMIT 5
+```
+
+### Configuration
+
+The embeddings can be customized in [backend/patient_similarity_embeddings.py](backend/patient_similarity_embeddings.py):
+
+```python
+embeddings_gen.generate_all_embeddings(
+    embedding_dim=256,           # Dimension of embeddings
+    node_similarity_top_k=10,    # Top K for node similarity
+    knn_top_k=25,                # Top K for KNN (neighbors per patient)
+    similarity_cutoff=0.01       # Minimum similarity threshold
+)
+```
+
+### Performance Considerations
+
+- **First-time setup**: 10-30 minutes to generate embeddings
+- **Query performance**: Sub-second (queries use pre-computed embeddings)
+- **Memory usage**: Depends on database size and embedding dimensions
+- **Embeddings persistence**: Stored in Neo4j, no regeneration needed unless data changes
+
+For more details, see [backend/README_EMBEDDINGS.md](backend/README_EMBEDDINGS.md).
+
 ## Deployment
 
 ### Deploying to Another Computer
@@ -912,11 +1034,21 @@ This streamlined architecture (validation → agent → tools → synthesis) com
   - `get_database_schema()` - Get schema information
   - `execute_custom_cypher()` - Execute custom Cypher queries
 
+#### [backend/patient_similarity_embeddings.py](backend/patient_similarity_embeddings.py)
+- Patient similarity embeddings generator using Neo4j GDS
+- Creates KNN-based similarity relationships between patients
+- Combines encounter, procedure, and drug patterns with demographics
+- Generates 256D embeddings for similarity matching
+- `find_similar_patients()` - Query for similar patients by KNN_SIMILARITY relationship
+
 #### [backend/agent.py](backend/agent.py)
 - Streamlined LangGraph agent architecture
 - Validation node (entry point) for query relevance checking
 - Main agent node with tool-calling and self-synthesis capabilities
-- 7 tools including 6 pre-built patient query tools + execute_custom_query
+- 8 tools including 7 pre-built patient query tools + execute_custom_query
+  - 6 standard query tools (procedures, conditions, medications, encounters, search, schema)
+  - 1 patient similarity tool (find_similar_patients using KNN embeddings)
+  - 1 custom analytics tool (execute_custom_query with Cypher subgraph)
 - execute_custom_query tool invokes Cypher subgraph for complex analytics
 - Conversation state management with Command pattern and reducers
 - Query tracking via executed_queries state with add_queries reducer
@@ -954,7 +1086,7 @@ This streamlined architecture (validation → agent → tools → synthesis) com
 
 #### [frontend/graph.html](frontend/graph.html)
 - Interactive LangGraph visualization using vis-network
-- Shows complete architecture: validation, agent, 7 tools, Cypher subgraph
+- Shows complete architecture: validation, agent, 8 tools, Cypher subgraph
 - Displays conditional edges (thick orange) vs regular edges (thin gray)
 - Return edges (dashed) showing tool → agent flow
 - Expandable Cypher subgraph view showing internal structure
@@ -967,11 +1099,16 @@ This streamlined architecture (validation → agent → tools → synthesis) com
 - **requirements.txt** - All Python dependencies
 - **backend/.env.example** - Environment configuration template
 - **backend/.env** - Environment configuration (not in git)
+- **backend/README_EMBEDDINGS.md** - Patient similarity embeddings setup guide
 - **.gitignore** - Git ignore rules
 - **README.md** - Comprehensive documentation (this file)
-- **start_server.sh** - Automated startup script
-- **test_connection.py** - Connection testing utility
-- **test_cypher_subagent.py** - Cypher subagent tests
+
+### Test Suite
+
+- **backend/tests/test_connection.py** - Neo4j connection testing utility
+- **backend/tests/test_cypher.py** - Cypher query generation tests
+- **backend/tests/test_subgraph.py** - Cypher subgraph integration tests
+- **backend/tests/test_query_tracking.py** - Complete query tracking system tests (8 tools)
 
 ## Key Design Decisions
 
@@ -1021,13 +1158,50 @@ This streamlined architecture (validation → agent → tools → synthesis) com
 
 ## Testing & Validation
 
+The project includes a comprehensive test suite covering all major components:
+
+### Test Coverage
+
+**Connection & Database (test_connection.py)**
 - ✅ Neo4j connection tested successfully
 - ✅ Query functions tested with real data
-- ✅ Found 5885 patients in database
-- ✅ Successfully retrieved procedures for test patients
-- ✅ Agent initialization working
-- ✅ API endpoints functional
+- ✅ Found 5,885 patients in database
+
+**Cypher Generation (test_cypher.py)**
+- ✅ Cypher query generation tested
+- ✅ Query validation and safety checks
+- ✅ LIMIT clause enforcement
+
+**Subgraph Integration (test_subgraph.py)**
 - ✅ Cypher subagent query generation tested
+- ✅ Subgraph invocation and state management
+- ✅ End-to-end subgraph flow
+
+**Complete System (test_query_tracking.py)**
+- ✅ All 8 tools tested individually:
+  - Standard tools: procedures, conditions, medications, encounters, search, schema
+  - Similarity tool: find_similar_patients with KNN embeddings
+  - Custom analytics: execute_custom_query with Cypher subgraph
+- ✅ Query tracking system validated
+- ✅ Command pattern and reducers tested
+- ✅ Agent initialization and routing working
+- ✅ API endpoints functional
+
+### Running Tests
+
+```bash
+# Navigate to tests directory
+cd agentic_graph_rag/backend/tests
+
+# Run all tests
+/Users/varunbk/repo/synthea/agentic_graph_rag/.venv/bin/pytest -v
+
+# Run specific test
+/Users/varunbk/repo/synthea/agentic_graph_rag/.venv/bin/pytest test_query_tracking.py::test_get_patient_procedures_tool -v -s
+
+# Run with debug logging
+export TOOL_DEBUG_LOGGING=true && /Users/varunbk/repo/synthea/agentic_graph_rag/.venv/bin/pytest test_query_tracking.py -v -s
+```
 
 ## Troubleshooting
 
